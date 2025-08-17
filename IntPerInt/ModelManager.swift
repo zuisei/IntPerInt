@@ -149,6 +149,7 @@ class ModelManager: ObservableObject {
 
         currentGenerationTask = Task {
             await MainActor.run { self.isGenerating = true }
+            logger.info("generation started, provider=\(String(describing: provider.rawValue), privacy: .public), promptLen=\(content.count)")
 
             let params = GenerationParams()
             let isCancelled: @Sendable () -> Bool = {
@@ -180,6 +181,7 @@ class ModelManager: ObservableObject {
                     self.isGenerating = false
                     self.currentGenerationTask = nil
                 }
+        logger.info("generation finished successfully")
             } catch {
                 await MainActor.run {
                     let errorMessage = ChatMessage(content: "Error: \(error.localizedDescription)", isUser: false)
@@ -194,7 +196,8 @@ class ModelManager: ObservableObject {
     }
 
     func cancelGeneration() {
-        currentGenerationTask?.cancel()
+    currentGenerationTask?.cancel()
+    logger.info("generation cancelled by user")
         currentGenerationTask = nil
         Task { @MainActor in self.isGenerating = false }
     }
