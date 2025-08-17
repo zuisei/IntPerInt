@@ -50,7 +50,8 @@ enum AIProvider: String, CaseIterable {
     }
 }
 
-struct ModelInfo {
+struct ModelInfo: Identifiable, Hashable {
+    var id: String { fileName }
     let name: String
     let huggingFaceRepo: String
     let fileName: String

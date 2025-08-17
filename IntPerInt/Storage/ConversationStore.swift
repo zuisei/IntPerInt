@@ -4,11 +4,17 @@ actor ConversationStore {
     static let shared = ConversationStore()
     private let fileURL: URL
 
+    // default init for app
     init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let dir = appSupport.appendingPathComponent("IntPerInt", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         self.fileURL = dir.appendingPathComponent("conversations.json")
+    }
+
+    // test-only convenience init
+    init(fileURL: URL) {
+        self.fileURL = fileURL
     }
 
     func load() async -> [Conversation] {
