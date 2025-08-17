@@ -6,6 +6,9 @@ struct ContentView: View {
     @State private var selectedProvider: AIProvider = .llamaCpp
     @State private var messageInput = ""
     @State private var selectedModel: String? = nil
+    @AppStorage("hasSeenWelcome") private var hasSeenWelcome: Bool = false
+    @State private var showWelcome: Bool = false
+    @State private var showModelDownload: Bool = false
 
     var body: some View {
         NavigationSplitView {
@@ -58,28 +61,31 @@ struct ContentView: View {
             .frame(minWidth: 260)
         } detail: {
             VStack(spacing: 0) {
-                // 右上ヘッダー：会話ごとのProvider/Model選択
+                // 右上ヘッダー：会話ごとのProvider/Model選択（ローカルモデルのみ）
                 HStack(spacing: 8) {
-                    if !modelManager.availableModels.isEmpty {
-                        // 選択値は String（非Optional）に統一
+                    if !modelManager.installedModels.isEmpty {
                         Picker("Model", selection: Binding<String>(
                             get: {
-                                if let id = modelManager.selectedConversationID,
-                                   let conv = modelManager.conversations.first(where: { $0.id == id }) {
-                                    return conv.modelName ?? (selectedModel ?? modelManager.availableModels.first!)
-                                }
-                                return selectedModel ?? modelManager.availableModels.first!
+                                // 現在の会話/状態から選択値を正規化し、必ず既存タグ(fileName)を返す
+                                let current: String? = {
+                                    if let id = modelManager.selectedConversationID,
+                                       let conv = modelManager.conversations.first(where: { $0.id == id }) {
+                                        return conv.modelName ?? selectedModel
+                                    }
+                                    return selectedModel
+                                }()
+                                return normalizedTag(from: current) ?? modelManager.installedModels.first!.fileName
                             },
                             set: { newVal in
                                 if let id = modelManager.selectedConversationID,
                                    let idx = modelManager.conversations.firstIndex(where: { $0.id == id }) {
-                                    modelManager.conversations[idx].modelName = newVal
+                                    modelManager.conversations[idx].modelName = newVal // fileName を保存
                                 }
                                 selectedModel = newVal
                             }
                         )) {
-                            ForEach(modelManager.availableModels, id: \.self) { m in
-                                Text(m).tag(m)
+                            ForEach(modelManager.installedModels) { m in
+                                Text(m.name).tag(m.fileName)
                             }
                         }
                         .frame(maxWidth: 320)
@@ -101,22 +107,51 @@ struct ContentView: View {
                 )
             }
         }
-        .onAppear { modelManager.loadAvailableModels() }
-        .onChange(of: modelManager.availableModels) { models in
+        .sheet(isPresented: $showWelcome) {
+            WelcomeView(modelManager: modelManager, hasSeenWelcome: $hasSeenWelcome) {
+                showWelcome = false
+            }
+            .frame(minWidth: 960, minHeight: 600)
+        }
+        .sheet(isPresented: $showModelDownload) {
+            ModelDownloadView(modelManager: modelManager) { fileName in
+                modelManager.setCurrentModelForSelectedConversation(name: fileName)
+                showModelDownload = false
+            }
+            .frame(minWidth: 800, minHeight: 520)
+        }
+        .onAppear {
+            modelManager.loadAvailableModels()
+            // Show welcome on first launch or when no local models
+            showWelcome = !hasSeenWelcome || !modelManager.hasAnyLocalModel
+        }
+        .onChange(of: modelManager.installedModels) { models in
             // 初回ロード/更新時、会話やローカル未選択なら自動選択
-            if let first = (models.first { $0.hasSuffix(".gguf") } ?? models.first) {
-                if selectedModel == nil { selectedModel = first }
-                if let id = modelManager.selectedConversationID,
-                   let idx = modelManager.conversations.firstIndex(where: { $0.id == id }),
-                   modelManager.conversations[idx].modelName == nil {
-                    modelManager.conversations[idx].modelName = first
+            if let first = models.first?.fileName {
+                let current: String? = {
+                    if let id = modelManager.selectedConversationID,
+                       let conv = modelManager.conversations.first(where: { $0.id == id }) {
+                        return conv.modelName ?? selectedModel
+                    }
+                    return selectedModel
+                }()
+                // 正規化しても一致しない場合は先頭に寄せる
+                let normalized = normalizedTag(from: current)
+                if normalized == nil {
+                    if let id = modelManager.selectedConversationID,
+                       let idx = modelManager.conversations.firstIndex(where: { $0.id == id }) {
+                        modelManager.conversations[idx].modelName = first
+                    }
+                    if selectedModel == nil { selectedModel = first }
                 }
             }
+            // if no local models, keep welcome visible
+            if !modelManager.hasAnyLocalModel { showWelcome = true }
         }
         .onChange(of: modelManager.selectedConversationID) { _ in
             // 会話切替時、モデル未設定なら自動で割り当て
             guard let id = modelManager.selectedConversationID else { return }
-            if let first = (modelManager.availableModels.first { $0.hasSuffix(".gguf") } ?? modelManager.availableModels.first),
+            if let first = modelManager.installedModels.first?.fileName,
                let idx = modelManager.conversations.firstIndex(where: { $0.id == id }),
                modelManager.conversations[idx].modelName == nil {
                 modelManager.conversations[idx].modelName = first
@@ -124,20 +159,38 @@ struct ContentView: View {
         }
     }
 
+    // 旧データ（モデル名）→ 現在のPickerタグ（fileName）に正規化
+    private func normalizedTag(from value: String?) -> String? {
+        guard let value = value else { return nil }
+        // すでに fileName 形式で、installed に存在するならそのまま
+        if value.hasSuffix(".gguf"), modelManager.installedModels.contains(where: { $0.fileName == value }) {
+            return value
+        }
+        // 旧: カタログ名から fileName に解決し、それが installed にあるなら採用
+        if let info = ModelInfo.availableModels.first(where: { $0.name == value }) {
+            let file = info.fileName
+            if modelManager.installedModels.contains(where: { $0.fileName == file }) {
+                return file
+            }
+        }
+        // 解決不可
+        return nil
+    }
+
     private func sendMessage() {
         let trimmed = messageInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
         // 会話ごとのModelを優先（Providerはグローバル設定を使用）
-    let providerToUse = selectedProvider
-    var modelToUse = selectedModel
+        let providerToUse = selectedProvider
+        var modelToUse = selectedModel
         if let id = modelManager.selectedConversationID,
            let conv = modelManager.conversations.first(where: { $0.id == id }) {
             modelToUse = conv.modelName ?? modelToUse
         }
-        // モデル未選択時は自動選択
+        // モデル未選択時は自動選択（インストール済みから）
         if modelToUse == nil {
-            modelToUse = (modelManager.availableModels.first { $0.hasSuffix(".gguf") } ?? modelManager.availableModels.first)
+            modelToUse = modelManager.installedModels.first?.fileName
             // 会話に反映
             if let id = modelManager.selectedConversationID,
                let idx = modelManager.conversations.firstIndex(where: { $0.id == id }) {
@@ -145,7 +198,7 @@ struct ContentView: View {
             }
             selectedModel = modelToUse
         }
-    guard let model = modelToUse else { return }
+        guard let model = modelToUse else { return }
 
         messageInput = ""
         modelManager.sendMessage(trimmed, using: model, provider: providerToUse)
@@ -238,29 +291,29 @@ private struct ChatArea: View {
                     )
                     .frame(maxWidth: 900)
                     // 送信ボタンを重ねて右に半分はみ出す
-                        .overlay(alignment: .trailing) {
-                            if isGenerating {
-                                Button(action: onCancel) {
-                                    Image(systemName: "stop.fill")
-                                        .imageScale(.medium)
-                                        .foregroundStyle(.white)
-                                        .padding(12)
-                                        .background(Color.red, in: Circle())
-                                }
-                                .offset(x: 12)
-                            } else {
-                                Button(action: onSend) {
-                                    Image(systemName: "paperplane.fill")
-                                        .imageScale(.medium)
-                                        .foregroundStyle(.white)
-                                        .padding(12)
-                                        .background((messageInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedModel == nil) ? Color.accentColor.opacity(0.5) : Color.accentColor, in: Circle())
-                                }
-                                .keyboardShortcut(.return, modifiers: [.command])
-                                .disabled(messageInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                                .offset(x: 12)
+                    .overlay(alignment: .trailing) {
+                        if isGenerating {
+                            Button(action: onCancel) {
+                                Image(systemName: "stop.fill")
+                                    .imageScale(.medium)
+                                    .foregroundStyle(.white)
+                                    .padding(12)
+                                    .background(Color.red, in: Circle())
                             }
+                            .offset(x: 12)
+                        } else {
+                            Button(action: onSend) {
+                                Image(systemName: "paperplane.fill")
+                                    .imageScale(.medium)
+                                    .foregroundStyle(.white)
+                                    .padding(12)
+                                    .background((messageInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedModel == nil) ? Color.accentColor.opacity(0.5) : Color.accentColor, in: Circle())
+                            }
+                            .keyboardShortcut(.return, modifiers: [.command])
+                            .disabled(messageInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .offset(x: 12)
                         }
+                    }
 
                     Spacer(minLength: 0)
                 }
