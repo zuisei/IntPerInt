@@ -65,6 +65,16 @@
     "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/Build/Intermediates.noindex/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/arm64/Models.swiftdeps",
     "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/Build/Intermediates.noindex/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/arm64/Models~partial.swiftmodule"
   },
+  "/Users/0xt4/Projects/IntPerInt/IntPerInt/Shared/RuntimeEnv.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/Build/Intermediates.noindex/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/arm64/RuntimeEnv.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/Build/Intermediates.noindex/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/arm64/RuntimeEnv.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/Build/Intermediates.noindex/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/arm64/RuntimeEnv.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/arm64/RuntimeEnv.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/Build/Intermediates.noindex/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/arm64/RuntimeEnv.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/Build/Intermediates.noindex/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/arm64/RuntimeEnv.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/Build/Intermediates.noindex/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/arm64/RuntimeEnv.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/Build/Intermediates.noindex/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/arm64/RuntimeEnv~partial.swiftmodule"
+  },
   "/Users/0xt4/Projects/IntPerInt/IntPerInt/Storage/ConversationStore.swift" : {
     "const-values" : "/Users/0xt4/Projects/IntPerInt/build/Build/Intermediates.noindex/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/arm64/ConversationStore.swiftconstvalues",
     "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/Build/Intermediates.noindex/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/arm64/ConversationStore.d",
