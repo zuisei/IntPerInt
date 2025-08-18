@@ -26,9 +26,11 @@ public struct LlamaCppEngine: LLMEngine {
 
                 let proc = Process()
                 proc.executableURL = cliURL
-                // run a minimal generation to cause model to load; many builds accept -n 1
-                // run a minimal prompt to force load
-                proc.arguments = ["-m", modelPath.path, "-p", "test", "-n", "1"]
+                // Minimal generation to trigger model load
+                var args = ["-m", modelPath.path, "-p", "test", "-n", "1"]
+                // try to reduce verbosity if supported by the build
+                args += ["--log-verbosity", "0"]
+                proc.arguments = args
                 let errPipe = Pipe(); proc.standardError = errPipe
                 let outPipe = Pipe(); proc.standardOutput = outPipe
 
@@ -37,9 +39,12 @@ public struct LlamaCppEngine: LLMEngine {
 
                 if proc.terminationStatus != 0 {
                     let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-                    let errStr = String(data: errData, encoding: .utf8) ?? "Unknown error"
-                    log.error("Model preload failed: \(errStr, privacy: .public)")
-                    throw NSError(domain: "LlamaCppEngine", code: Int(proc.terminationStatus), userInfo: [NSLocalizedDescriptionKey: errStr])
+                    let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+                    let errStr = String(data: errData, encoding: .utf8) ?? ""
+                    let outStr = String(data: outData, encoding: .utf8) ?? ""
+                    let msg = [errStr, outStr].joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+                    log.error("Model preload failed: \(msg, privacy: .public)")
+                    throw NSError(domain: "LlamaCppEngine", code: Int(proc.terminationStatus), userInfo: [NSLocalizedDescriptionKey: msg.isEmpty ? "Unknown error" : msg])
                 }
 
                 log.info("REAL ENGINE LOADED, model path: \(modelPath.path, privacy: .public)")
@@ -79,8 +84,11 @@ public struct LlamaCppEngine: LLMEngine {
 
             // Build args (llama.cpp cli オプションはバージョンにより異なるため代表的なものを使用)
             var args: [String] = ["-m", modelURL.path, "-p", combined, "-n", String(max(1, params.maxTokens)), "--temp", String(params.temperature)]
-            if let seed = params.seed { args += ["-r", String(seed)] }
-            if let stop = params.stop, !stop.isEmpty { for s in stop { args += ["-e", s] } }
+            if let seed = params.seed { args += ["--seed", String(seed)] }
+            if let stop = params.stop, !stop.isEmpty {
+                // llama.cpp uses -r / --reverse-prompt to stop when seq is encountered in input; some builds use -e/--stop for stop tokens
+                for s in stop { args += ["-r", s] }
+            }
 
             log.info("REAL ENGINE LOADED, model path: \(modelURL.path, privacy: .public)")
             log.info("system info: \(ProcessInfo.processInfo.operatingSystemVersionString, privacy: .public)")
@@ -92,7 +100,7 @@ public struct LlamaCppEngine: LLMEngine {
             let errPipe = Pipe(); proc.standardError = errPipe
 
             // Accumulator actor to avoid concurrent mutation warnings
-            actor Accumulator { var text = ""; func append(_ s: String) { text += s }; func value() -> String { text } }
+            actor Accumulator { var text = ""; func append(_ s: String) { text += s }; func snapshot() -> String { text } }
             let acc = Accumulator()
 
             try proc.run()
@@ -129,7 +137,7 @@ public struct LlamaCppEngine: LLMEngine {
                 let errStr = String(data: errData, encoding: .utf8) ?? "Unknown error"
                 throw NSError(domain: "LlamaCppEngine", code: Int(status), userInfo: [NSLocalizedDescriptionKey: errStr])
             }
-            return await acc.value()
+            return await acc.snapshot()
         }
     }
 }
@@ -142,12 +150,13 @@ private extension LlamaCppEngine {
         let candidates: [String] = {
             var paths: [String] = []
             if let env = ProcessInfo.processInfo.environment["LLAMACPP_CLI"], !env.isEmpty { paths.append(env) }
+            // Preferred brew locations first, then /tmp builds
             paths.append(contentsOf: [
+                "/usr/local/bin/llama-cli",
+                "/opt/homebrew/bin/llama-cli",
                 "/tmp/llama.cpp/build/bin/llama-cli", // cmake build (current)
                 "/tmp/llama.cpp/bin/llama-cli",      // cmake build (older)
-                "/tmp/llama.cpp/main",          // make build (legacy)
-                "/usr/local/bin/llama-cli",
-                "/opt/homebrew/bin/llama-cli"
+                "/tmp/llama.cpp/main"                // make build (legacy)
             ])
             return paths
         }()
