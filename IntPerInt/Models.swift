@@ -57,8 +57,22 @@ struct ModelInfo: Identifiable, Hashable {
     let fileName: String
     
     static let availableModels = [
-        ModelInfo(name: "Llama-2-7b-Chat", huggingFaceRepo: "TheBloke/Llama-2-7B-Chat-GGML", fileName: "llama-2-7b-chat.q4_0.gguf"),
-        ModelInfo(name: "CodeLlama-7b-Instruct", huggingFaceRepo: "TheBloke/CodeLlama-7B-Instruct-GGML", fileName: "codellama-7b-instruct.q4_0.gguf"),
-        ModelInfo(name: "Mistral-7b-Instruct", huggingFaceRepo: "TheBloke/Mistral-7B-Instruct-v0.1-GGML", fileName: "mistral-7b-instruct-v0.1.q4_0.gguf")
+        // 広く使われている 7B 系 OSS モデル（GGUF, Q4_K_M 量子化例）
+        ModelInfo(name: "Mistral-7B-Instruct v0.2", huggingFaceRepo: "TheBloke/Mistral-7B-Instruct-v0.2-GGUF", fileName: "mistral-7b-instruct-v0.2.Q4_K_M.gguf"),
+        ModelInfo(name: "Zephyr-7B-Beta", huggingFaceRepo: "TheBloke/zephyr-7B-beta-GGUF", fileName: "zephyr-7b-beta.Q4_K_M.gguf"),
+        ModelInfo(name: "OpenHermes-2.5-Mistral-7B", huggingFaceRepo: "TheBloke/OpenHermes-2.5-Mistral-7B-GGUF", fileName: "openhermes-2.5-mistral-7b.Q4_K_M.gguf"),
+    ModelInfo(name: "Llama-2-7B-Chat", huggingFaceRepo: "TheBloke/Llama-2-7B-Chat-GGUF", fileName: "llama-2-7b-chat.Q4_K_M.gguf"),
+
+    // 大型（より高品質、要メモリ）：
+    ModelInfo(name: "Mixtral-8x7B-Instruct v0.1", huggingFaceRepo: "TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF", fileName: "mixtral-8x7b-instruct-v0.1.Q4_K_M.gguf"),
+    ModelInfo(name: "Nous-Hermes-2 Mixtral 8x7B DPO", huggingFaceRepo: "TheBloke/Nous-Hermes-2-Mixtral-8x7B-DPO-GGUF", fileName: "nous-hermes-2-mixtral-8x7b-dpo.Q4_K_M.gguf"),
+    ModelInfo(name: "Llama-2-13B-Chat", huggingFaceRepo: "TheBloke/Llama-2-13B-Chat-GGUF", fileName: "llama-2-13b-chat.Q4_K_M.gguf"),
+    ModelInfo(name: "SOLAR-10.7B-Instruct v1.0", huggingFaceRepo: "TheBloke/solar-10.7b-instruct-v1.0-GGUF", fileName: "solar-10.7b-instruct-v1.0.Q4_K_M.gguf"),
+
+    // 軽量（高速・省メモリ）
+    ModelInfo(name: "TinyLlama-1.1B-Chat v1.0", huggingFaceRepo: "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF", fileName: "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"),
+    ModelInfo(name: "Phi-2 (2.7B)", huggingFaceRepo: "TheBloke/phi-2-GGUF", fileName: "phi-2.Q4_K_M.gguf"),
+    ModelInfo(name: "Gemma-2-2B-it", huggingFaceRepo: "TheBloke/gemma-2-2b-it-GGUF", fileName: "gemma-2-2b-it.Q4_K_M.gguf"),
+    ModelInfo(name: "Qwen2.5-1.5B-Instruct", huggingFaceRepo: "TheBloke/Qwen2.5-1.5B-Instruct-GGUF", fileName: "qwen2.5-1.5b-instruct.Q4_K_M.gguf")
     ]
 }

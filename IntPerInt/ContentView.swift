@@ -61,35 +61,64 @@ struct ContentView: View {
             .frame(minWidth: 260)
         } detail: {
             VStack(spacing: 0) {
-                // 右上ヘッダー：会話ごとのProvider/Model選択（ローカルモデルのみ）
+                // 右上ヘッダー：会話ごとのProvider/Model選択
                 HStack(spacing: 8) {
-                    if !modelManager.installedModels.isEmpty {
-                        Picker("Model", selection: Binding<String>(
-                            get: {
-                                // 現在の会話/状態から選択値を正規化し、必ず既存タグ(fileName)を返す
-                                let current: String? = {
-                                    if let id = modelManager.selectedConversationID,
-                                       let conv = modelManager.conversations.first(where: { $0.id == id }) {
-                                        return conv.modelName ?? selectedModel
-                                    }
-                                    return selectedModel
-                                }()
-                                return normalizedTag(from: current) ?? modelManager.installedModels.first!.fileName
-                            },
-                            set: { newVal in
+                    // ピッカーは「有効(valid)なモデルのみ」or「None」
+                    let noneTag = "__none__"
+                    Picker("Model", selection: Binding<String>(
+                        get: {
+                            // 現在の会話 or ローカル選択値を fileName に正規化
+                            let current: String? = {
+                                if let id = modelManager.selectedConversationID,
+                                   let conv = modelManager.conversations.first(where: { $0.id == id }) {
+                                    return conv.modelName ?? selectedModel
+                                }
+                                return selectedModel
+                            }()
+                            // 正規化しつつ、有効モデルに存在しない場合は先頭の有効モデル or noneTag
+                            if let tag = normalizedTag(from: current),
+                               modelManager.validInstalledModels.contains(where: { $0.fileName == tag }) {
+                                return tag
+                            }
+                            return modelManager.validInstalledModels.first?.fileName ?? noneTag
+                        },
+                        set: { newVal in
+                            if newVal == noneTag {
+                                // None を選択 → 会話のモデルを解除
                                 if let id = modelManager.selectedConversationID,
                                    let idx = modelManager.conversations.firstIndex(where: { $0.id == id }) {
-                                    modelManager.conversations[idx].modelName = newVal // fileName を保存
+                                    modelManager.conversations[idx].modelName = nil
+                                }
+                                selectedModel = nil
+                            } else {
+                                // 有効モデルのみ代入
+                                if let id = modelManager.selectedConversationID,
+                                   let idx = modelManager.conversations.firstIndex(where: { $0.id == id }) {
+                                    modelManager.conversations[idx].modelName = newVal
                                 }
                                 selectedModel = newVal
                             }
-                        )) {
-                            ForEach(modelManager.installedModels) { m in
+                        }
+                    )) {
+                        if modelManager.validInstalledModels.isEmpty {
+                            Text("None").tag(noneTag)
+                        } else {
+                            ForEach(modelManager.validInstalledModels, id: \.fileName) { m in
                                 Text(m.name).tag(m.fileName)
                             }
                         }
-                        .frame(maxWidth: 320)
                     }
+                    .frame(maxWidth: 320)
+
+                    // Welcome 以外からもダウンロード画面を開けるボタン
+                    Button {
+                        showModelDownload = true
+                    } label: {
+                        Label("モデルをダウンロード", systemImage: "arrow.down.circle")
+                    }
+                    .buttonStyle(.bordered)
+                    .help("推奨 GGUF モデルをカタログから取得")
+
                     Spacer()
                 }
                 .padding(.horizontal, 16)
@@ -125,9 +154,9 @@ struct ContentView: View {
             // Show welcome on first launch or when no local models
             showWelcome = !hasSeenWelcome || !modelManager.hasAnyLocalModel
         }
-        .onChange(of: modelManager.installedModels) { models in
-            // 初回ロード/更新時、会話やローカル未選択なら自動選択
-            if let first = models.first?.fileName {
+        .onChange(of: modelManager.validInstalledModels) { valid in
+            // 初回ロード/更新時、会話やローカル未選択なら有効モデルの先頭に寄せる
+            if let first = valid.first?.fileName {
                 let current: String? = {
                     if let id = modelManager.selectedConversationID,
                        let conv = modelManager.conversations.first(where: { $0.id == id }) {
@@ -137,7 +166,7 @@ struct ContentView: View {
                 }()
                 // 正規化しても一致しない場合は先頭に寄せる
                 let normalized = normalizedTag(from: current)
-                if normalized == nil {
+                if normalized == nil || !valid.contains(where: { $0.fileName == normalized }) {
                     if let id = modelManager.selectedConversationID,
                        let idx = modelManager.conversations.firstIndex(where: { $0.id == id }) {
                         modelManager.conversations[idx].modelName = first
@@ -151,7 +180,7 @@ struct ContentView: View {
         .onChange(of: modelManager.selectedConversationID) { _ in
             // 会話切替時、モデル未設定なら自動で割り当て
             guard let id = modelManager.selectedConversationID else { return }
-            if let first = modelManager.installedModels.first?.fileName,
+            if let first = modelManager.validInstalledModels.first?.fileName,
                let idx = modelManager.conversations.firstIndex(where: { $0.id == id }),
                modelManager.conversations[idx].modelName == nil {
                 modelManager.conversations[idx].modelName = first
@@ -163,13 +192,13 @@ struct ContentView: View {
     private func normalizedTag(from value: String?) -> String? {
         guard let value = value else { return nil }
         // すでに fileName 形式で、installed に存在するならそのまま
-        if value.hasSuffix(".gguf"), modelManager.installedModels.contains(where: { $0.fileName == value }) {
+        if value.hasSuffix(".gguf"), modelManager.validInstalledModels.contains(where: { $0.fileName == value }) {
             return value
         }
         // 旧: カタログ名から fileName に解決し、それが installed にあるなら採用
         if let info = ModelInfo.availableModels.first(where: { $0.name == value }) {
             let file = info.fileName
-            if modelManager.installedModels.contains(where: { $0.fileName == file }) {
+            if modelManager.validInstalledModels.contains(where: { $0.fileName == file }) {
                 return file
             }
         }
@@ -188,9 +217,9 @@ struct ContentView: View {
            let conv = modelManager.conversations.first(where: { $0.id == id }) {
             modelToUse = conv.modelName ?? modelToUse
         }
-        // モデル未選択時は自動選択（インストール済みから）
+        // モデル未選択時は自動選択（有効モデルから）
         if modelToUse == nil {
-            modelToUse = modelManager.installedModels.first?.fileName
+            modelToUse = modelManager.validInstalledModels.first?.fileName
             // 会話に反映
             if let id = modelManager.selectedConversationID,
                let idx = modelManager.conversations.firstIndex(where: { $0.id == id }) {
