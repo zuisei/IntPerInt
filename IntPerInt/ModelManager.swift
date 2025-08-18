@@ -224,23 +224,7 @@ class ModelManager: ObservableObject {
         scheduleSave()
     }
     
-    private func generateResponse(for prompt: String, using modelName: String, provider: AIProvider) async throws -> String {
-        switch provider {
-        case .llamaCpp:
-            // legacy sync-style generator (kept for compatibility)
-            return try await generateLlamaCppResponse(prompt: prompt, modelName: modelName)
-        }
-    }
-    
-    private func generateLlamaCppResponse(prompt: String, modelName: String) async throws -> String {
-        // TODO: Implement actual LLaMA.cpp integration
-        // For now, return a mock response to test the UI
-        
-        // Simulate processing time
-        try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-        
-        return "Mock response to: \(prompt)\n\nThis is a placeholder response. The actual LLaMA.cpp integration will be implemented once the library is properly linked to the project."
-    }
+    // (legacy sync-style generator functions removed; runtime always uses engine.generate in normal runs)
 
     // Prepare engine if model file changed
     private func prepareEngineIfNeeded() async throws {
