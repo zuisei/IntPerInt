@@ -95,6 +95,9 @@ struct ModelDownloadView: View {
     @ObservedObject var modelManager: ModelManager
     var onUseModel: (String) -> Void
     @State private var query = ""
+    @Environment(\.dismiss) private var dismiss
+    @State private var showDeleteConfirm = false
+    @State private var pendingDelete: ModelInfo? = nil
 
     private var recommended: [ModelInfo] {
         if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return ModelInfo.availableModels }
@@ -103,13 +106,21 @@ struct ModelDownloadView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
+            HStack(alignment: .center, spacing: 12) {
                 Text("モデルをダウンロード")
                     .font(.title2.bold())
                 Spacer()
                 TextField("検索", text: $query)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 280)
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .imageScale(.medium)
+                }
+                .buttonStyle(.bordered)
+                .help("閉じる")
             }
 
             Table(recommended) {
@@ -135,14 +146,50 @@ struct ModelDownloadView: View {
                         } else if isDownloaded {
                             Button("このモデルを使う") { onUseModel(m.fileName) }
                             Button("フォルダ") { NSWorkspace.shared.activateFileViewerSelecting([modelManager.modelsDir.appendingPathComponent(m.fileName)]) }
+                            Button(role: .destructive) {
+                                pendingDelete = m
+                                showDeleteConfirm = true
+                            } label: { Text("削除") }
                         } else {
                             Button("ダウンロード") { modelManager.downloadModel(m.name) }
                         }
                     }
                 }
             }
+
+            // インストール済みモデル（カタログ外も含む）
+            if !modelManager.installedModels.isEmpty {
+                Divider().padding(.top, 8)
+                Text("インストール済み")
+                    .font(.headline)
+                Table(modelManager.installedModels) {
+                    TableColumn("名称") { im in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(im.name)
+                            Text(im.fileName).font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                    TableColumn("操作") { im in
+                        HStack(spacing: 8) {
+                            Button("このモデルを使う") { onUseModel(im.fileName) }
+                            Button("フォルダ") { NSWorkspace.shared.activateFileViewerSelecting([im.url]) }
+                            Button(role: .destructive) { pendingDelete = ModelInfo(name: im.name, huggingFaceRepo: "", fileName: im.fileName); showDeleteConfirm = true } label: { Text("削除") }
+                        }
+                    }
+                }
+                .frame(minHeight: 160)
+            }
         }
         .padding(20)
+        .alert("モデルを削除しますか？", isPresented: $showDeleteConfirm, presenting: pendingDelete) { m in
+            Button("削除", role: .destructive) {
+                modelManager.deleteInstalledModel(m.fileName)
+                pendingDelete = nil
+            }
+            Button("キャンセル", role: .cancel) { pendingDelete = nil }
+        } message: { m in
+            Text(m.fileName)
+        }
         .onAppear { modelManager.loadAvailableModels() }
     }
 }

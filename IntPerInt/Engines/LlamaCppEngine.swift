@@ -149,9 +149,15 @@ private extension LlamaCppEngine {
             if let env = ProcessInfo.processInfo.environment["LLAMACPP_CLI"], !env.isEmpty { paths.append(env) }
             // Preferred brew locations first, then /tmp builds
             paths.append(contentsOf: [
-                "/usr/local/bin/llama-cli",
+                // Homebrew / system
+                "/opt/homebrew/bin/llama",
+                "/usr/local/bin/llama",
                 "/opt/homebrew/bin/llama-cli",
+                "/usr/local/bin/llama-cli",
+                // Local builds
+                "/tmp/llama.cpp/build/bin/llama",
                 "/tmp/llama.cpp/build/bin/llama-cli", // cmake build (current)
+                "/tmp/llama.cpp/bin/llama",
                 "/tmp/llama.cpp/bin/llama-cli",      // cmake build (older)
                 "/tmp/llama.cpp/main"                // make build (legacy)
             ])
