@@ -496,16 +496,16 @@
 		BBEFE0F12E51F4FB00081BA4 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
 				COPY_PHASE_STRIP = NO;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_OPTIMIZATION_LEVEL = 0;
-				PRODUCT_NAME = IntPerIntUITests;
 				GENERATE_INFOPLIST_FILE = YES;
-				SWIFT_VERSION = 5.0;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.IntPerIntUITests;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				CODE_SIGNING_ALLOWED = NO;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.IntPerIntUITests;
+				PRODUCT_NAME = IntPerIntUITests;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};

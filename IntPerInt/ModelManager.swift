@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import os
+import AppKit
 
 @MainActor
 class ModelManager: ObservableObject {
@@ -13,6 +14,8 @@ class ModelManager: ObservableObject {
     @Published var availableModels: [String] = []
     // インストール済み（ローカルに存在）モデルのみ（Picker はこれだけを表示）
     @Published private(set) var installedModels: [InstalledModel] = []
+    // 有効性検証済み（llama.cpp で最小実行が成功）モデルのみ（Picker はこれだけを選択可能にする）
+    @Published private(set) var validInstalledModels: [InstalledModel] = []
     @Published var downloadingModels: Set<String> = []
     @Published var downloadProgress: [String: Double] = [:]
     @Published var isLoading: Bool = false
@@ -106,6 +109,28 @@ class ModelManager: ObservableObject {
         downloadingModels.remove(modelName)
         downloadProgress.removeValue(forKey: modelName)
     }
+
+    // ローカルに保存されたモデルを削除
+    func deleteInstalledModel(_ fileName: String) {
+        let target = modelsDirectory.appendingPathComponent(fileName)
+        do {
+            if FileManager.default.fileExists(atPath: target.path) {
+                try FileManager.default.removeItem(at: target)
+            }
+            // このモデルを参照している会話を解除
+            for i in conversations.indices {
+                if conversations[i].modelName == fileName { conversations[i].modelName = nil }
+            }
+            // 現在ロード中モデルに一致するならエンジン状態をリセット
+            if currentModelPath?.path == target.path {
+                currentModelPath = nil
+            }
+            // 再スキャン（有効性検証も内部で実施）
+            refreshInstalledModels()
+        } catch {
+            print("Model delete failed: \(error)")
+        }
+    }
     
     func newConversation() {
         let conv = Conversation(title: "New Chat", messages: [], updatedAt: Date())
@@ -149,6 +174,7 @@ class ModelManager: ObservableObject {
 
         currentGenerationTask = Task {
             await MainActor.run { self.isGenerating = true }
+            logger.info("generation started, provider=\(String(describing: provider.rawValue), privacy: .public), promptLen=\(content.count)")
 
             let params = GenerationParams()
             let isCancelled: @Sendable () -> Bool = {
@@ -180,6 +206,7 @@ class ModelManager: ObservableObject {
                     self.isGenerating = false
                     self.currentGenerationTask = nil
                 }
+        logger.info("generation finished successfully")
             } catch {
                 await MainActor.run {
                     let errorMessage = ChatMessage(content: "Error: \(error.localizedDescription)", isUser: false)
@@ -194,7 +221,8 @@ class ModelManager: ObservableObject {
     }
 
     func cancelGeneration() {
-        currentGenerationTask?.cancel()
+    currentGenerationTask?.cancel()
+    logger.info("generation cancelled by user")
         currentGenerationTask = nil
         Task { @MainActor in self.isGenerating = false }
     }
@@ -221,23 +249,7 @@ class ModelManager: ObservableObject {
         scheduleSave()
     }
     
-    private func generateResponse(for prompt: String, using modelName: String, provider: AIProvider) async throws -> String {
-        switch provider {
-        case .llamaCpp:
-            // legacy sync-style generator (kept for compatibility)
-            return try await generateLlamaCppResponse(prompt: prompt, modelName: modelName)
-        }
-    }
-    
-    private func generateLlamaCppResponse(prompt: String, modelName: String) async throws -> String {
-        // TODO: Implement actual LLaMA.cpp integration
-        // For now, return a mock response to test the UI
-        
-        // Simulate processing time
-        try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-        
-        return "Mock response to: \(prompt)\n\nThis is a placeholder response. The actual LLaMA.cpp integration will be implemented once the library is properly linked to the project."
-    }
+    // (legacy sync-style generator functions removed; runtime always uses engine.generate in normal runs)
 
     // Prepare engine if model file changed
     private func prepareEngineIfNeeded() async throws {
@@ -308,6 +320,9 @@ extension ModelManager {
             return InstalledModel(name: prettyName(for: file), fileName: file, url: url)
         }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         installedModels = built
+
+    // インストール済みから有効モデルを検証・抽出
+    validateInstalledModels()
     }
 
     private func prettyName(for fileName: String) -> String {
@@ -320,6 +335,68 @@ extension ModelManager {
         main = main.replacingOccurrences(of: "-", with: " ").capitalized
         if !quant.isEmpty { quant = " (\(quant))" }
         return main + quant
+    }
+}
+
+// MARK: - Model validation (llama.cpp quick check)
+extension ModelManager {
+    private func validateInstalledModels() {
+        let candidates = self.installedModels
+        DispatchQueue.global(qos: .utility).async {
+            var valid: [InstalledModel] = []
+            guard let cli = try? _ModelValidator.resolveLlamaCLI() else {
+                DispatchQueue.main.async { self.validInstalledModels = [] }
+                return
+            }
+            for m in candidates {
+                if _ModelValidator.quickValidateBlocking(cliURL: cli, modelURL: m.url, timeoutSeconds: 8) {
+                    valid.append(m)
+                }
+            }
+            DispatchQueue.main.async { self.validInstalledModels = valid }
+        }
+    }
+}
+
+// MARK: - Local validator utilities (non-actor isolated)
+private enum _ModelValidator {
+    static func resolveLlamaCLI() throws -> URL {
+        let fm = FileManager.default
+        var paths: [String] = []
+        if let env = ProcessInfo.processInfo.environment["LLAMACPP_CLI"], !env.isEmpty { paths.append(env) }
+        paths.append(contentsOf: [
+            // Homebrew / system
+            "/opt/homebrew/bin/llama",
+            "/usr/local/bin/llama",
+            "/opt/homebrew/bin/llama-cli",
+            "/usr/local/bin/llama-cli",
+            // Local builds
+            "/tmp/llama.cpp/build/bin/llama",
+            "/tmp/llama.cpp/build/bin/llama-cli",
+            "/tmp/llama.cpp/bin/llama",
+            "/tmp/llama.cpp/bin/llama-cli",
+            "/tmp/llama.cpp/main"
+        ])
+        for p in paths { if fm.isExecutableFile(atPath: p) { return URL(fileURLWithPath: p) } }
+        throw NSError(domain: "ModelValidator", code: 404, userInfo: [NSLocalizedDescriptionKey: "llama.cpp CLI not found. Set LLAMACPP_CLI or install 'llama' via Homebrew."])
+    }
+
+    static func quickValidateBlocking(cliURL: URL, modelURL: URL, timeoutSeconds: Double = 8) -> Bool {
+        let proc = Process()
+        proc.executableURL = cliURL
+        proc.arguments = ["-m", modelURL.path, "-p", "test", "-n", "1"]
+        let errPipe = Pipe(); proc.standardError = errPipe
+        let outPipe = Pipe(); proc.standardOutput = outPipe
+        do { try proc.run() } catch { return false }
+        let start = Date()
+        while proc.isRunning {
+            if Date().timeIntervalSince(start) > timeoutSeconds {
+                proc.terminate()
+                break
+            }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        return proc.terminationStatus == 0
     }
 }
 

@@ -1,0 +1,181 @@
+*** Begin Patch
+*** Update File: Engines/LlamaCppEngine.swift
+@@
++import os
++import Foundation
++import os.log
+@@
++private let logger = Logger(subsystem: "com.intperint.app", category: "LlamaCppEngine")
++
++final class LlamaCppEngine: LLMEngine {
++    private var currentProcess: Process?
++
++    init() { }
++
++    // Load model: if running under XCTest, skip real load (keep deterministic tests)
++    func load(modelPath: URL) async throws {
++        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
++            logger.debug("XCTest detected — skipping real load for \(modelPath.path, privacy: .public)")
++            return
++        }
++
++        // Resolve CLI path candidates
++        let envCLI = ProcessInfo.processInfo.environment["LLAMACPP_CLI"]
++        let candidates = [
++            envCLI,
++            "/tmp/llama.cpp/build/bin/llama-cli",
++            "/tmp/llama.cpp/build/main",
++            "/usr/local/bin/llama",
++            "/opt/homebrew/bin/llama",
++            "/usr/local/bin/llama-cli",
++            "/opt/homebrew/bin/llama-cli"
++        ].compactMap { $0 }
++
++        var execPath: String? = nil
++        for p in candidates {
++            if FileManager.default.isExecutableFile(atPath: p) {
++                execPath = p
++                break
++            }
++        }
++        guard let exec = execPath else {
++            logger.error("No llama-cli binary found in candidates.")
++            throw LLMEngineError.runtime("llama-cli not found; set LLAMACPP_CLI env or build llama.cpp at /tmp/llama.cpp")
++        }
++
++        logger.info("Attempting real engine preload with \(exec, privacy: .public) for \(modelPath.path, privacy: .public)")
++
++        // Try common invocation patterns with timeout
++        let patterns: [[String]] = [
++            ["-m", modelPath.path, "-p", "Hello", "-n", "1"],
++            ["-m", modelPath.path, "--prompt", "Hello", "--n_predict", "1"],
++            ["-m", modelPath.path, "--prompt", "Hello", "--max-tokens", "1"],
++            ["-m", modelPath.path, "-t", "1", "-n", "1"]
++        ]
++
++        var success = false
++        var lastOutput = ""
++        for args in patterns {
++            do {
++                let out = try await runProcessWithTimeout(exec: exec, args: args, timeoutSeconds: 10)
++                lastOutput = out
++                logger.info("Preload trial succeeded for args: \(args.description, privacy: .public)")
++                success = true
++                break
++            } catch {
++                logger.debug("Preload trial failed for args \(args.description, privacy: .public): \(String(describing: error))")
++                continue
++            }
++        }
++
++        if !success {
++            logger.error("All preload trials failed. Last output: \(lastOutput, privacy: .public)")
++            throw LLMEngineError.runtime("preload failed; see logs")
++        }
++
++        logger.info("REAL ENGINE LOADED: \(modelPath.path, privacy: .public)")
++    }
++
++    // Generate: stream stdout chunks to onToken safely (local buffer + MainActor UI update)
++    func generate(prompt: String, onToken: @escaping (String) -> Void) async throws {
++        let envCLI = ProcessInfo.processInfo.environment["LLAMACPP_CLI"]
++        let candidates = [
++            envCLI,
++            "/tmp/llama.cpp/build/bin/llama-cli",
++            "/tmp/llama.cpp/build/main",
++            "/usr/local/bin/llama",
++            "/opt/homebrew/bin/llama",
++            "/usr/local/bin/llama-cli",
++            "/opt/homebrew/bin/llama-cli"
++        ].compactMap { $0 }
++        guard let exec = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
++            throw LLMEngineError.runtime("llama-cli not found")
++        }
++
++        logger.info("Starting generation with \(exec, privacy: .public)")
++
++        let proc = Process()
++        proc.executableURL = URL(fileURLWithPath: exec)
++        // NOTE: Replace the following args with the pattern you discovered in PART A.
++        proc.arguments = ["-p", prompt, "-n", "128"]
++
++        let stdoutPipe = Pipe()
++        proc.standardOutput = stdoutPipe
++        proc.standardError = Pipe()
++
++        var localAccum = ""
++        currentProcess = proc
++
++        try proc.run()
++        logger.info("generation started")
++
++        stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
++            let data = handle.availableData
++            guard data.count > 0 else { return }
++            if let s = String(data: data, encoding: .utf8) {
++                localAccum += s
++                Task {
++                    await MainActor.run {
++                        onToken(s)
++                    }
++                }
++            }
++        }
++
++        proc.waitUntilExit()
++        stdoutPipe.fileHandleForReading.readabilityHandler = nil
++        currentProcess = nil
++
++        if proc.terminationStatus == 0 {
++            logger.info("generation finished")
++            return
++        } else {
++            logger.info("generation terminated with status \(proc.terminationStatus)")
++            throw LLMEngineError.runtime("generation failed (code \(proc.terminationStatus))")
++        }
++    }
++
++    func cancel() {
++        if let p = currentProcess, p.isRunning {
++            p.terminate()
++            logger.info("generation cancelled via cancel()")
++        }
++    }
++
++    // Helper: run process with timeout and capture stdout
++    private func runProcessWithTimeout(exec: String, args: [String], timeoutSeconds: Int) async throws -> String {
++        return try await withCheckedThrowingContinuation { cont in
++            let p = Process()
++            p.executableURL = URL(fileURLWithPath: exec)
++            p.arguments = args
++            let outPipe = Pipe()
++            p.standardOutput = outPipe
++            do {
++                try p.run()
++            } catch {
++                cont.resume(throwing: error)
++                return
++            }
++            let q = DispatchQueue.global()
++            q.asyncAfter(deadline: .now() + .seconds(timeoutSeconds)) {
++                if p.isRunning {
++                    p.terminate()
++                    let data = outPipe.fileHandleForReading.readDataToEndOfFile()
++                    let s = String(data: data, encoding: .utf8) ?? ""
++                    cont.resume(throwing: LLMEngineError.runtime("timeout; partial output: \(s)"))
++                }
++            }
++            DispatchQueue.global().async {
++                p.waitUntilExit()
++                let data = outPipe.fileHandleForReading.readDataToEndOfFile()
++                let s = String(data: data, encoding: .utf8) ?? ""
++                if p.terminationStatus == 0 {
++                    cont.resume(returning: s)
++                } else {
++                    cont.resume(throwing: LLMEngineError.runtime("exit \(p.terminationStatus): \(s)"))
++                }
++            }
++        }
++    }
++}
+*** End Patch
