@@ -13,9 +13,9 @@ public struct LlamaCppEngine: LLMEngine {
         // 保存しておく
         self.modelURL = modelPath
 
-        // Unit Test のみモック許可
-        let isUnitTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-        self.useMock = isUnitTests
+    // Unit Test のみモック許可
+    let isUnitTests = RuntimeEnv.isRunningTests
+    self.useMock = isUnitTests
 
         // For real runs, perform a lightweight CLI invocation to ensure the model can be loaded by llama.cpp.
         // This triggers the actual library load/check at first send (initial load), and surfaces errors early.
@@ -27,10 +27,7 @@ public struct LlamaCppEngine: LLMEngine {
                 let proc = Process()
                 proc.executableURL = cliURL
                 // Minimal generation to trigger model load
-                var args = ["-m", modelPath.path, "-p", "test", "-n", "1"]
-                // try to reduce verbosity if supported by the build
-                args += ["--log-verbosity", "0"]
-                proc.arguments = args
+                proc.arguments = ["-m", modelPath.path, "-p", "test", "-n", "1"]
                 let errPipe = Pipe(); proc.standardError = errPipe
                 let outPipe = Pipe(); proc.standardOutput = outPipe
 
