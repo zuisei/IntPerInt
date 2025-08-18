@@ -31,6 +31,12 @@ public struct LlamaCppEngine: LLMEngine {
                 let errPipe = Pipe(); proc.standardError = errPipe
                 let outPipe = Pipe(); proc.standardOutput = outPipe
 
+                // Ensure Metal resources path for ggml
+                var env = ProcessInfo.processInfo.environment
+                if env["GGML_METAL_PATH_RESOURCES"] == nil {
+                    env["GGML_METAL_PATH_RESOURCES"] = Self.resolveMetalResourcesPath(defaultExecDir: cliURL.deletingLastPathComponent())
+                }
+                proc.environment = env
                 try proc.run()
                 proc.waitUntilExit()
 
@@ -80,11 +86,17 @@ public struct LlamaCppEngine: LLMEngine {
             let combined = ([systemPrompt, prompt].compactMap { $0 }).joined(separator: "\n")
 
             // Build args (llama.cpp cli オプションはバージョンにより異なるため代表的なものを使用)
-            var args: [String] = ["-m", modelURL.path, "-p", combined, "-n", String(max(1, params.maxTokens)), "--temp", String(params.temperature)]
+            var args: [String] = [
+                "-m", modelURL.path,
+                "-p", combined,
+                "-n", String(max(1, params.maxTokens)),
+                "--temp", String(params.temperature),
+                "--log-verbosity", "0"
+            ]
             if let seed = params.seed { args += ["--seed", String(seed)] }
             if let stop = params.stop, !stop.isEmpty {
-                // llama.cpp uses -r / --reverse-prompt to stop when seq is encountered in input; some builds use -e/--stop for stop tokens
-                for s in stop { args += ["-r", s] }
+                // use --stop for stop sequences; repeat per each
+                for s in stop where !s.isEmpty { args += ["--stop", s] }
             }
 
             log.info("REAL ENGINE LOADED, model path: \(modelURL.path, privacy: .public)")
@@ -93,6 +105,12 @@ public struct LlamaCppEngine: LLMEngine {
             let proc = Process()
             proc.executableURL = cliURL
             proc.arguments = args
+            // Ensure Metal resources path for ggml
+            var env = ProcessInfo.processInfo.environment
+            if env["GGML_METAL_PATH_RESOURCES"] == nil {
+                env["GGML_METAL_PATH_RESOURCES"] = Self.resolveMetalResourcesPath(defaultExecDir: cliURL.deletingLastPathComponent())
+            }
+            proc.environment = env
             let outPipe = Pipe(); proc.standardOutput = outPipe
             let errPipe = Pipe(); proc.standardError = errPipe
 
@@ -142,30 +160,46 @@ public struct LlamaCppEngine: LLMEngine {
 // MARK: - Helpers
 private extension LlamaCppEngine {
     func resolveLlamaCLI() throws -> URL {
-        // 検索パス: 環境変数, よくあるビルド先（/tmp/llama.cpp）、Homebrew
+        // 優先: ユーザ設定 → 環境変数 → 統一リゾルバ（brew bin/opt、Cellar/bin, libexec, App Support/bin など）
         let fm = FileManager.default
-        let candidates: [String] = {
-            var paths: [String] = []
-            if let env = ProcessInfo.processInfo.environment["LLAMACPP_CLI"], !env.isEmpty { paths.append(env) }
-            // Preferred brew locations first, then /tmp builds
-            paths.append(contentsOf: [
-                // Homebrew / system
-                "/opt/homebrew/bin/llama",
-                "/usr/local/bin/llama",
-                "/opt/homebrew/bin/llama-cli",
-                "/usr/local/bin/llama-cli",
-                // Local builds
-                "/tmp/llama.cpp/build/bin/llama",
-                "/tmp/llama.cpp/build/bin/llama-cli", // cmake build (current)
-                "/tmp/llama.cpp/bin/llama",
-                "/tmp/llama.cpp/bin/llama-cli",      // cmake build (older)
-                "/tmp/llama.cpp/main"                // make build (legacy)
-            ])
-            return paths
-        }()
-        for p in candidates {
-            if fm.isExecutableFile(atPath: p) { return URL(fileURLWithPath: p) }
+        // 1) ユーザ設定（ディレクトリ指定にも対応）
+        if let pref = UserDefaults.standard.string(forKey: "LLAMACPP_CLI"), !pref.isEmpty {
+            for cand in Self.expandIfDirectory(pref) { if fm.isExecutableFile(atPath: cand) { return URL(fileURLWithPath: cand) } }
         }
-        throw NSError(domain: "LlamaCppEngine", code: 404, userInfo: [NSLocalizedDescriptionKey: "llama.cpp CLI not found. Set LLAMACPP_CLI or build to /tmp/llama.cpp."])
+        // 2) 環境変数（ディレクトリ指定にも対応）
+        if let env = ProcessInfo.processInfo.environment["LLAMACPP_CLI"], !env.isEmpty {
+            for cand in Self.expandIfDirectory(env) { if fm.isExecutableFile(atPath: cand) { return URL(fileURLWithPath: cand) } }
+        }
+        // 3) 統一候補群から解決
+        for p in LlamaCLIResolver.candidates() { if fm.isExecutableFile(atPath: p) { return URL(fileURLWithPath: p) } }
+        throw NSError(domain: "LlamaCppEngine", code: 404, userInfo: [NSLocalizedDescriptionKey: "llama.cpp CLI not found. Set LLAMACPP_CLI, `brew install llama.cpp`, or place the binary under App Support/IntPerInt/bin."])
+    }
+
+    static func resolveMetalResourcesPath(defaultExecDir: URL) -> String {
+        // 例: /opt/homebrew/Cellar/llama.cpp/6180/libexec → ../share/llama.cpp
+        let cellarShare = defaultExecDir.deletingLastPathComponent().appendingPathComponent("share/llama.cpp")
+        let candidates: [URL] = [
+            defaultExecDir,
+            cellarShare,
+            URL(fileURLWithPath: "/tmp/llama.cpp/build/bin"),
+            URL(fileURLWithPath: "/tmp/llama.cpp"),
+            URL(fileURLWithPath: "/opt/homebrew/opt/llama.cpp/share/llama.cpp"),
+            URL(fileURLWithPath: "/usr/local/opt/llama.cpp/share/llama.cpp")
+        ]
+        for dir in candidates {
+            let file = dir.appendingPathComponent("default.metallib")
+            if FileManager.default.fileExists(atPath: file.path) { return dir.path }
+        }
+        return defaultExecDir.path
+    }
+
+    // ディレクトリが与えられた場合に /llama-cli, /llama を補完して候補展開
+    static func expandIfDirectory(_ path: String) -> [String] {
+        var out: [String] = [path]
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue {
+            out = [path + "/llama-cli", path + "/llama"]
+        }
+        return out
     }
 }
