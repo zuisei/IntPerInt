@@ -42,15 +42,30 @@ if [ -z "${MODEL_URL}" ]; then
   fi
 fi
 
-FNAME=$(basename "$MODEL_URL")
-DEST="$MODELS_DIR/$FNAME"
-
-if [ -f "$DEST" ]; then
-  echo "[INFO] 既に存在: $DEST"
+if [[ "$MODEL_URL" =~ ^file:// ]]; then
+  SRC_PATH="${MODEL_URL#file://}"
+elif [[ "$MODEL_URL" =~ ^/ ]]; then
+  SRC_PATH="$MODEL_URL"
 else
-  echo "[STEP] ダウンロード中..."
-  curl -L --fail --progress-bar -o "$DEST" "$MODEL_URL"
-  echo "[OK] ダウンロード完了: $DEST"
+  SRC_PATH=""
+fi
+
+if [ -n "$SRC_PATH" ]; then
+  echo "[STEP] ローカルファイルをコピー: $SRC_PATH"
+  FNAME=$(basename "$SRC_PATH")
+  DEST="$MODELS_DIR/$FNAME"
+  cp -f "$SRC_PATH" "$DEST"
+else
+  FNAME=$(basename "$MODEL_URL")
+  DEST="$MODELS_DIR/$FNAME"
+
+  if [ -f "$DEST" ]; then
+    echo "[INFO] 既に存在: $DEST"
+  else
+    echo "[STEP] ダウンロード中..."
+    curl -L --fail --progress-bar -o "$DEST" "$MODEL_URL"
+    echo "[OK] ダウンロード完了: $DEST"
+  fi
 fi
 
 echo "[STEP] モデルサイズ:"
@@ -128,3 +143,9 @@ eval run_with_timeout 30 "$EXEC" $SUCCESS_ARGS 2>&1 | sed -n '1,200p'
 echo "[DONE] 出力サンプル完了."
 echo "Models dir:"
 ls -lh "$MODELS_DIR"
+
+echo
+echo "使い方:"
+echo "  非対話: ./intperint_run_test.sh <model-url-or-local-path>"
+echo "  例: ./intperint_run_test.sh https://huggingface.co/.../model.gguf"
+echo "      ./intperint_run_test.sh /path/to/model.gguf"

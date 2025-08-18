@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import AppKit
 
 struct ContentView: View {
     @StateObject private var modelManager = ModelManager()
@@ -9,6 +10,9 @@ struct ContentView: View {
     @AppStorage("hasSeenWelcome") private var hasSeenWelcome: Bool = false
     @State private var showWelcome: Bool = false
     @State private var showModelDownload: Bool = false
+    @State private var isDownloadMinimized: Bool = false
+    @State private var showSettings: Bool = false
+    @State private var showDiagnostics: Bool = false
 
     var body: some View {
         NavigationSplitView {
@@ -77,10 +81,14 @@ struct ContentView: View {
                             }()
                             // 正規化しつつ、有効モデルに存在しない場合は先頭の有効モデル or noneTag
                             if let tag = normalizedTag(from: current),
-                               modelManager.validInstalledModels.contains(where: { $0.fileName == tag }) {
+                               (modelManager.validInstalledModels.contains(where: { $0.fileName == tag }) ||
+                                modelManager.installedModels.contains(where: { $0.fileName == tag })) {
                                 return tag
                             }
-                            return modelManager.validInstalledModels.first?.fileName ?? noneTag
+                            // prefer validated; fallback to installed
+                            return modelManager.validInstalledModels.first?.fileName
+                                   ?? modelManager.installedModels.first?.fileName
+                                   ?? noneTag
                         },
                         set: { newVal in
                             if newVal == noneTag {
@@ -100,30 +108,86 @@ struct ContentView: View {
                             }
                         }
                     )) {
-                        if modelManager.validInstalledModels.isEmpty {
-                            Text("None").tag(noneTag)
-                        } else {
+                        if !modelManager.validInstalledModels.isEmpty {
                             ForEach(modelManager.validInstalledModels, id: \.fileName) { m in
                                 Text(m.name).tag(m.fileName)
                             }
+                        } else if !modelManager.installedModels.isEmpty {
+                            // Fallback to installed models when validation is unavailable
+                            ForEach(modelManager.installedModels, id: \.fileName) { m in
+                                Text(m.name + " (未検証)").tag(m.fileName)
+                            }
+                        } else {
+                            Text("None").tag(noneTag)
                         }
                     }
                     .frame(maxWidth: 320)
 
+                    // モデル状態ラベル（簡潔表記）
+                    Group {
+                        if let tag = selectedModel,
+                           let installed = modelManager.installedModels.first(where: { $0.fileName == tag }) {
+                            let sizeMB = (try? FileManager.default.attributesOfItem(atPath: installed.url.path)[.size] as? NSNumber)?.int64Value ?? 0
+                            Text("Installed (\(Double(sizeMB) / 1_000_000.0, specifier: "%.0f")MB)")
+                                .font(.caption2)
+                                .padding(.horizontal, 8).padding(.vertical, 3)
+                                .background(Capsule().fill(Color.green.opacity(0.2)))
+                        } else if selectedModel != nil {
+                            Text("Remote")
+                                .font(.caption2)
+                                .padding(.horizontal, 8).padding(.vertical, 3)
+                                .background(Capsule().fill(Color.orange.opacity(0.2)))
+                        }
+                    }
+
                     // Welcome 以外からもダウンロード画面を開けるボタン
                     Button {
-                        showModelDownload = true
+                        showModelDownload = true; isDownloadMinimized = false
                     } label: {
                         Label("モデルをダウンロード", systemImage: "arrow.down.circle")
                     }
                     .buttonStyle(.bordered)
                     .help("推奨 GGUF モデルをカタログから取得")
 
+                    // 設定（LLAMACPP_CLI）
+                    Button {
+                        showSettings.toggle()
+                    } label: {
+                        Label("設定", systemImage: "gearshape")
+                    }
+                    .buttonStyle(.bordered)
+                    .popover(isPresented: $showSettings) {
+                        SettingsPopover()
+                            .frame(width: 380)
+                            .padding(16)
+                    }
+
+                    Button {
+                        showDiagnostics.toggle()
+                    } label: {
+                        Label("診断", systemImage: "stethoscope")
+                    }
+                    .buttonStyle(.bordered)
+                    .sheet(isPresented: $showDiagnostics) {
+                        DiagnosticsView()
+                    }
+
                     Spacer()
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .background(.thinMaterial)
+
+                // 通知バナー（チャットに混ぜない）
+                if let notice = modelManager.systemNotifications.first {
+                    SystemNotificationBanner(notice: notice) {
+                        handleNotificationAction(notice)
+                    } onClose: {
+                        modelManager.dismissNotification(id: notice.id)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                }
 
                 // チャット本文
                 ChatArea(
@@ -142,13 +206,57 @@ struct ContentView: View {
             }
             .frame(minWidth: 960, minHeight: 600)
         }
-        .sheet(isPresented: $showModelDownload) {
-            ModelDownloadView(modelManager: modelManager) { fileName in
-                modelManager.setCurrentModelForSelectedConversation(name: fileName)
-                showModelDownload = false
+    // Overlay for ModelDownload: floating island (top-right), 非ブロッキング + 最小化対応
+    .overlay(alignment: .topTrailing) {
+        if showModelDownload {
+            VStack {
+                HStack {
+                    if isDownloadMinimized {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.down.circle")
+                            Text("ダウンロード")
+                            if !modelManager.downloadingModels.isEmpty {
+                                Text("\(modelManager.downloadingModels.count)件進行中")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Button { isDownloadMinimized = false } label: { Image(systemName: "arrow.up.left.and.arrow.down.right") }
+                                .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .overlay(Capsule().stroke(Color.white.opacity(0.08)))
+                        .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
+                    } else {
+                        ModelDownloadView(modelManager: modelManager) { fileName in
+                            modelManager.setCurrentModelForSelectedConversation(name: fileName)
+                            showModelDownload = false
+                        } onClose: { showModelDownload = false } minimize: { isDownloadMinimized = true }
+                        .frame(width: 560, height: 560)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.08))
+                        )
+                        .shadow(color: .black.opacity(0.35), radius: 24, y: 8)
+                    }
+                }
+                .padding(.top, 72)
+                .padding(.trailing, 24)
+                Spacer()
             }
-            .frame(minWidth: 800, minHeight: 520)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .zIndex(1000)
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .animation(.spring(response: 0.3, dampingFraction: 0.85), value: showModelDownload)
         }
+    }
+    // Hidden global Command-Q handler (active in all states, including overlays)
+    .overlay(alignment: .topLeading) {
+        Button("") { NSApplication.shared.terminate(nil) }
+        .keyboardShortcut("q", modifiers: [.command])
+        .labelsHidden()
+        .frame(width: 0, height: 0)
+        .opacity(0.001)
+    }
         .onAppear {
             modelManager.loadAvailableModels()
             // Show welcome on first launch or when no local models
@@ -173,6 +281,15 @@ struct ContentView: View {
                     }
                     if selectedModel == nil { selectedModel = first }
                 }
+            } else if !modelManager.installedModels.isEmpty {
+                // valid が空でも installed があればそちらで自動選択
+                let installedFirst = modelManager.installedModels.first!.fileName
+                if let id = modelManager.selectedConversationID,
+                   let idx = modelManager.conversations.firstIndex(where: { $0.id == id }),
+                   modelManager.conversations[idx].modelName == nil {
+                    modelManager.conversations[idx].modelName = installedFirst
+                }
+                if selectedModel == nil { selectedModel = installedFirst }
             }
             // if no local models, keep welcome visible
             if !modelManager.hasAnyLocalModel { showWelcome = true }
@@ -220,6 +337,7 @@ struct ContentView: View {
         // モデル未選択時は自動選択（有効モデルから）
         if modelToUse == nil {
             modelToUse = modelManager.validInstalledModels.first?.fileName
+                ?? modelManager.installedModels.first?.fileName
             // 会話に反映
             if let id = modelManager.selectedConversationID,
                let idx = modelManager.conversations.firstIndex(where: { $0.id == id }) {
@@ -231,6 +349,20 @@ struct ContentView: View {
 
         messageInput = ""
         modelManager.sendMessage(trimmed, using: model, provider: providerToUse)
+    }
+
+    private func handleNotificationAction(_ notice: ModelManager.SystemNotification) {
+        guard let action = notice.actions.first else { return }
+        switch action {
+        case .openSettings:
+            showSettings = true
+        case .openModelsFolder:
+            NSWorkspace.shared.activateFileViewerSelecting([modelManager.modelsDir])
+        case .openDocs:
+            if let url = URL(string: "https://github.com/zuisei/IntPerInt#readme") { NSWorkspace.shared.open(url) }
+        case .brewInstall:
+            if let url = URL(string: "https://formulae.brew.sh/formula/llama.cpp") { NSWorkspace.shared.open(url) }
+        }
     }
 }
 
@@ -475,3 +607,204 @@ private struct ConversationRow: View {
 }
 
 #Preview { ContentView() }
+
+// MARK: - Settings Popover
+private struct SettingsPopover: View {
+    @State private var cliPath: String = UserDefaults.standard.string(forKey: "LLAMACPP_CLI") ?? ""
+    @State private var testResult: String = ""
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("設定").font(.headline)
+            Text("llama.cpp CLI のフルパスを指定 (例: /opt/homebrew/bin/llama-cli)")
+                .font(.caption).foregroundStyle(.secondary)
+            HStack {
+                TextField("/path/to/llama-cli", text: $cliPath)
+                    .textFieldStyle(.roundedBorder)
+                Button("保存") {
+                    UserDefaults.standard.set(cliPath, forKey: "LLAMACPP_CLI")
+                }
+                Button("参照…") { browseForCLI() }
+                Button("アプリに取り込む") { installIntoAppBin() }
+                    .disabled(!FileManager.default.isExecutableFile(atPath: cliPath.trimmingCharacters(in: .whitespacesAndNewlines)))
+            }
+            HStack {
+                Button("検出/テスト") {
+                    let trimmed = cliPath.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if FileManager.default.isExecutableFile(atPath: trimmed) {
+                        if let ver = runVersion(bin: trimmed) {
+                            testResult = "OK: " + ver
+                        } else {
+                            testResult = "OK: 実行可能 (version取得不可)"
+                        }
+                    } else {
+                        // 未設定なら自動検出→テスト
+                        if let found = autoDetectCLIReturnPath() {
+                            cliPath = found
+                            UserDefaults.standard.set(found, forKey: "LLAMACPP_CLI")
+                            if let ver = runVersion(bin: found) {
+                                testResult = "OK: " + ver
+                            } else {
+                                testResult = "OK: 実行可能 (version取得不可)"
+                            }
+                        } else {
+                            testResult = "NG: 見つかりませんでした"
+                        }
+                    }
+                }
+                if !testResult.isEmpty { Text(testResult).font(.caption).foregroundStyle(.secondary) }
+                Spacer()
+                Button("自動検出") { autoDetectCLI() }
+                    .help("よくあるパスから自動検出します")
+            }
+        }
+    }
+
+    private func browseForCLI() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.executable]
+        panel.directoryURL = URL(fileURLWithPath: "/opt/homebrew/bin")
+        if panel.runModal() == .OK, let url = panel.url {
+            cliPath = url.path
+            UserDefaults.standard.set(cliPath, forKey: "LLAMACPP_CLI")
+            testResult = FileManager.default.isExecutableFile(atPath: cliPath) ? "OK: 実行可能" : "NG: 実行不可/未設定"
+        }
+    }
+
+    private func autoDetectCLI() {
+        if let found = autoDetectCLIReturnPath() {
+            cliPath = found
+            UserDefaults.standard.set(found, forKey: "LLAMACPP_CLI")
+            testResult = "OK: 実行可能"
+        } else {
+            testResult = "NG: 見つかりませんでした"
+        }
+    }
+
+    // LlamaCLIResolverの候補セットを利用して堅牢に検出。パス入力が実行可能ならそれも優先。
+    private func autoDetectCLIReturnPath() -> String? {
+        let fm = FileManager.default
+        let trimmed = cliPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        var candidates: [String] = []
+        if fm.isExecutableFile(atPath: trimmed) { candidates.append(trimmed) }
+        // 入力がディレクトリ（例: /opt/homebrew/Cellar/llama.cpp/<ver>/libexec や /bin）の場合も補完
+        var isDir: ObjCBool = false
+        if fm.fileExists(atPath: trimmed, isDirectory: &isDir), isDir.boolValue {
+            candidates.append(trimmed + "/llama-cli")
+            candidates.append(trimmed + "/llama")
+        }
+        // ユーティリティの候補（Cellar/libexecやApp Support/bin含む）
+        candidates += LlamaCLIResolver.candidates()
+        // 追加フォールバック: Homebrew Cellar を動的に列挙
+        for prefix in ["/opt/homebrew/Cellar/llama.cpp", "/usr/local/Cellar/llama.cpp"] {
+            var isDir2: ObjCBool = false
+            if fm.fileExists(atPath: prefix, isDirectory: &isDir2), isDir2.boolValue,
+               let entries = try? fm.contentsOfDirectory(atPath: prefix) {
+                let versions = entries.sorted { $0.compare($1, options: .numeric) == .orderedDescending }
+                for v in versions.prefix(5) {
+                    let base = prefix + "/" + v
+                    candidates.append(base + "/bin/llama-cli")
+                    candidates.append(base + "/bin/llama")
+                    candidates.append(base + "/libexec/llama-cli")
+                    candidates.append(base + "/libexec/llama")
+                }
+            }
+        }
+        return candidates.first(where: { fm.isExecutableFile(atPath: $0) })
+    }
+
+    // --version を実行して最初の行を返す
+    private func runVersion(bin: String) -> String? {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: bin)
+        proc.arguments = ["--version"]
+        let out = Pipe(); proc.standardOutput = out
+        let err = Pipe(); proc.standardError = err
+        do {
+            try proc.run()
+        } catch {
+            return nil
+        }
+        proc.waitUntilExit()
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        guard var s = String(data: data, encoding: .utf8) else { return nil }
+        s = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.isEmpty {
+            let e = err.fileHandleForReading.readDataToEndOfFile()
+            if let se = String(data: e, encoding: .utf8), !se.isEmpty {
+                return se.components(separatedBy: .newlines).first
+            }
+            return nil
+        }
+        return s.components(separatedBy: .newlines).first
+    }
+
+    // Application Support/IntPerInt/bin にCLIをコピーして固定化
+    private func installIntoAppBin() {
+        let fm = FileManager.default
+        let src = cliPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard fm.isExecutableFile(atPath: src) else { testResult = "NG: 実行不可/未設定"; return }
+        guard let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
+        let binDir = base.appendingPathComponent("IntPerInt/bin", isDirectory: true)
+        do { try fm.createDirectory(at: binDir, withIntermediateDirectories: true) } catch { testResult = "NG: コピー先作成失敗"; return }
+        let dst = binDir.appendingPathComponent("llama-cli")
+        do {
+            if fm.fileExists(atPath: dst.path) { try fm.removeItem(at: dst) }
+            try fm.copyItem(at: URL(fileURLWithPath: src), to: dst)
+            // 実行権付与
+            _ = try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dst.path)
+            cliPath = dst.path
+            UserDefaults.standard.set(dst.path, forKey: "LLAMACPP_CLI")
+            if let ver = runVersion(bin: dst.path) {
+                testResult = "OK: アプリ内に取り込み済み (" + ver + ")"
+            } else {
+                testResult = "OK: アプリ内に取り込み済み"
+            }
+        } catch {
+            testResult = "NG: コピー失敗 (" + (error as NSError).localizedDescription + ")"
+        }
+    }
+}
+
+// MARK: - System Notification Banner
+private struct SystemNotificationBanner: View {
+    let notice: ModelManager.SystemNotification
+    let onPrimaryAction: () -> Void
+    let onClose: () -> Void
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: iconName)
+                .foregroundStyle(color)
+            Text(notice.message)
+                .font(.subheadline)
+                .lineLimit(2)
+            Spacer()
+            if !notice.actions.isEmpty {
+                Button(actionTitle) { onPrimaryAction() }
+                    .buttonStyle(.bordered)
+            }
+            Button(action: onClose) { Image(systemName: "xmark") }
+                .buttonStyle(.plain)
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.06)))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08)))
+    }
+    private var color: Color {
+        switch notice.severity { case .info: return .blue; case .warning: return .orange; case .error: return .red }
+    }
+    private var iconName: String {
+        switch notice.severity { case .info: return "info.circle"; case .warning: return "exclamationmark.triangle"; case .error: return "xmark.octagon" }
+    }
+    private var actionTitle: String {
+        switch notice.actions.first {
+        case .openSettings: return "設定"
+        case .openModelsFolder: return "フォルダ"
+        case .openDocs: return "手順"
+        case .brewInstall: return "Brew"
+        case .none: return ""
+        }
+    }
+}

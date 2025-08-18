@@ -1,3 +1,4 @@
+printf "%s\n" "$PATH" | tr ':' '\n'
 # IntPerInt - Local AI Assistant
 
 SwiftUI製のmacOSアプリケーションで、ローカルLLM推論とクラウドAI APIを統合したインテリジェントなアシスタントです。
@@ -148,6 +149,62 @@ swift package clean
 # 依存関係をリセット
 swift package reset
 ```
+
+## 最終チェックと即応ポイント（実エンジン/インストール済み/送信直前ロード）
+
+以下は、実エンジンのみ・インストール済みのみ・送信直前ロードの最小差分実装が入っている前提での最終確認フローです。
+
+### 動作確認（アプリ内・最短手順）
+
+1) 任意：CLIパスを明示
+
+```bash
+export LLAMACPP_CLI=/tmp/llama.cpp/build/bin/llama-cli
+```
+
+2) アプリ起動 → モデル選択
+
+- Welcome/モデル一覧に「インストール済み .gguf」のみが表示されること
+- 例: tiny-mistral-Q4_K_M.gguf を選択
+
+3) 送信→プリロード→ストリーミング
+
+- 新規チャットで「hello」を送信（⌘⏎）
+- コンソール/OSLogに以下が出ること
+	- REAL ENGINE LOADED, model path: ...
+	- system info: ...
+- メッセージが逐次トークン表示される
+- Stopで即停止（プロセスterminate相当が走る）
+
+### ワンコマンド検証（CLI単体）
+
+モデル名は環境に合わせて差し替え：
+
+```bash
+/tmp/llama.cpp/build/bin/llama-cli \
+	-m "$HOME/Library/Application Support/IntPerInt/Models/tiny-mistral-Q4_K_M.gguf" \
+	-p "Hello from IntPerInt" \
+	-n 16 --temp 0.7 --seed 1 --stop "</s>" --log-verbosity 0
+```
+
+→ 先頭にバナー、続いて生成文が出ればOK。
+
+### ありがちなハマりどころ（即応）
+
+- ヘルプ画面が出る：引数違いの可能性。-p（または --prompt）と -n を使う。--max-tokens はビルドにより非対応。
+- プリロードで失敗：LLAMACPP_CLI が未検出 or 実行権限なし。chmod +x、export LLAMACPP_CLI=... を確認。
+- モデルが一覧に出ない：拡張子/配置。~/Library/Application Support/IntPerInt/Models/*.gguf 直下か要確認。
+- 停止が遅い：内部でプロセスterminateを呼ぶ実装。再現ログがあれば調整可能。
+
+### 実装ポイント（要旨）
+
+- LlamaCppEngine
+	- CLI検出順: $LLAMACPP_CLI → /opt/homebrew/... → /usr/local/... → /tmp/.../llama-cli → /tmp/.../main
+	- load(): -m <model> -p test -n 1 [--log-verbosity 0] でプリロード、成功時 REAL ENGINE LOADED ログ
+	- generate(): --stop 複数対応、--seed 対応、STDOUTを逐次読みでトークン表示。キャンセルで即terminate。
+- ModelManager
+	- 送信直前のみ prepareEngineIfNeeded() でロード。installed/valid のみに絞ったPicker。
+	- start/finish/cancel ログを出力。
 
 ## ライセンス
 
