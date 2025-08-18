@@ -1,0 +1,80 @@
+{
+  "source": "/Users/0xt4/Projects/IntPerInt/IntPerInt/ContentView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "New Chat",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 21
+        }
+      },
+      {
+        "comment": "",
+        "key": "Search",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 31
+        }
+      },
+      {
+        "comment": "",
+        "key": "Model",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 67
+        }
+      },
+      {
+        "comment": "",
+        "key": "⌘⏎ で送信 • Shift+Enterで改行",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 324
+        }
+      },
+      {
+        "comment": "",
+        "key": "Ask anything",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 264
+        }
+      },
+      {
+        "comment": "",
+        "key": "Download",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 358
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 351
+        }
+      },
+      {
+        "comment": "",
+        "key": "You",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 389
+        }
+      },
+      {
+        "comment": "",
+        "key": "Assistant",
+        "location": {
+          "startingColumn": 47,
+          "startingLine": 389
+        }
+      }
+    ]
+  },
+  "version": 1
+}

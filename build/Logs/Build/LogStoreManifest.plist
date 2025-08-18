@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>logFormatVersion</key>
+	<integer>11</integer>
+	<key>logs</key>
+	<dict>
+		<key>52F9C050-F775-40BB-B87D-B270F858C56B</key>
+		<dict>
+			<key>className</key>
+			<string>IDECommandLineBuildLog</string>
+			<key>documentTypeString</key>
+			<string>&lt;nil&gt;</string>
+			<key>domainType</key>
+			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
+			<key>fileName</key>
+			<string>52F9C050-F775-40BB-B87D-B270F858C56B.xcactivitylog</string>
+			<key>hasPrimaryLog</key>
+			<true/>
+			<key>primaryObservable</key>
+			<dict>
+				<key>highLevelStatus</key>
+				<string>S</string>
+				<key>totalNumberOfAnalyzerIssues</key>
+				<integer>0</integer>
+				<key>totalNumberOfErrors</key>
+				<integer>0</integer>
+				<key>totalNumberOfTestFailures</key>
+				<integer>0</integer>
+				<key>totalNumberOfWarnings</key>
+				<integer>0</integer>
+			</dict>
+			<key>schemeIdentifier-containerName</key>
+			<string>IntPerInt project</string>
+			<key>schemeIdentifier-schemeName</key>
+			<string>IntPerInt</string>
+			<key>schemeIdentifier-sharedScheme</key>
+			<integer>1</integer>
+			<key>signature</key>
+			<string>Cleaning project IntPerInt with scheme IntPerInt and configuration Debug</string>
+			<key>timeStartedRecording</key>
+			<real>777174129.41191196</real>
+			<key>timeStoppedRecording</key>
+			<real>777174129.61649895</real>
+			<key>title</key>
+			<string>Cleaning project IntPerInt with scheme IntPerInt and configuration Debug</string>
+			<key>uniqueIdentifier</key>
+			<string>52F9C050-F775-40BB-B87D-B270F858C56B</string>
+		</dict>
+		<key>A7B88971-2A76-4FFC-A2C2-050BA8832E4D</key>
+		<dict>
+			<key>className</key>
+			<string>IDECommandLineBuildLog</string>
+			<key>documentTypeString</key>
+			<string>&lt;nil&gt;</string>
+			<key>domainType</key>
+			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
+			<key>fileName</key>
+			<string>A7B88971-2A76-4FFC-A2C2-050BA8832E4D.xcactivitylog</string>
+			<key>hasPrimaryLog</key>
+			<true/>
+			<key>primaryObservable</key>
+			<dict>
+				<key>highLevelStatus</key>
+				<string>S</string>
+				<key>totalNumberOfAnalyzerIssues</key>
+				<integer>0</integer>
+				<key>totalNumberOfErrors</key>
+				<integer>0</integer>
+				<key>totalNumberOfTestFailures</key>
+				<integer>0</integer>
+				<key>totalNumberOfWarnings</key>
+				<integer>0</integer>
+			</dict>
+			<key>schemeIdentifier-containerName</key>
+			<string>IntPerInt project</string>
+			<key>schemeIdentifier-schemeName</key>
+			<string>IntPerInt</string>
+			<key>schemeIdentifier-sharedScheme</key>
+			<integer>1</integer>
+			<key>signature</key>
+			<string>Cleaning project IntPerInt with scheme IntPerInt and configuration Debug</string>
+			<key>timeStartedRecording</key>
+			<real>777169660.89151502</real>
+			<key>timeStoppedRecording</key>
+			<real>777169661.06302595</real>
+			<key>title</key>
+			<string>Cleaning project IntPerInt with scheme IntPerInt and configuration Debug</string>
+			<key>uniqueIdentifier</key>
+			<string>A7B88971-2A76-4FFC-A2C2-050BA8832E4D</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

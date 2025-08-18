@@ -1,0 +1,23 @@
+*** Begin Patch
+*** Update File: ModelManager.swift
+@@
+-    func sendMessage(...) {
++    func sendMessage(...) {
++        // 追加: 生成開始ログ
++        logger.info("sendMessage: conversation=\(selectedConversationID ?? "nil", privacy: .public) prompt=\(input.trimmingCharacters(in: .whitespacesAndNewlines).prefix(64))")
++        logger.info("generation started for conversation=\(selectedConversationID ?? "nil", privacy: .public)")
+         // existing send logic...
+@@
+-            // on success
++            // on success
++            logger.info("generation finished for conversation=\(selectedConversationID ?? "nil", privacy: .public)")
+         ...
+     }
+@@
+-    func cancelGeneration() {
++    func cancelGeneration() {
++        logger.info("generation cancel requested for conversation=\(selectedConversationID ?? "nil", privacy: .public)")
+         // existing cancel logic...
++        logger.info("generation cancel performed for conversation=\(selectedConversationID ?? "nil", privacy: .public)")
+     }
+*** End Patch
