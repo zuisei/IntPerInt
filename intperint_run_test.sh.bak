@@ -7,39 +7,10 @@ BUILD_DIR="$LLAMA_REPO/build"
 
 mkdir -p "$MODELS_DIR"
 
-# timeout wrapper: prefer gtimeout, fallback to python
-run_with_timeout() {
-  local seconds="$1"; shift
-  if command -v gtimeout >/dev/null 2>&1; then
-    gtimeout "${seconds}s" "$@"
-  else
-    python3 - <<'PY' "$seconds" "$@"
-import subprocess, sys, shlex
-secs = int(sys.argv[1])
-cmd = sys.argv[2:]
-try:
-    p = subprocess.Popen(cmd)
-    p.wait(timeout=secs)
-    sys.exit(p.returncode)
-except subprocess.TimeoutExpired:
-    p.kill()
-    try:
-        p.wait(timeout=2)
-    except Exception:
-        pass
-    # emulate timeout exit code 124
-    sys.exit(124)
-PY
-  fi
-}
-
-MODEL_URL=${1:-}
-if [ -z "${MODEL_URL}" ]; then
-  read -p "ダウンロードする .gguf の URL を入力してください（Enter で中断）: " MODEL_URL
-  if [ -z "$MODEL_URL" ]; then
-    echo "中断：モデル URL が指定されていません。"
-    exit 0
-  fi
+read -p "ダウンロードする .gguf の URL を入力してください（Enter で中断）: " MODEL_URL
+if [ -z "$MODEL_URL" ]; then
+  echo "中断：モデル URL が指定されていません。"
+  exit 0
 fi
 
 FNAME=$(basename "$MODEL_URL")
@@ -75,8 +46,8 @@ echo
 
 # detect executable
 EXEC=""
-if [ -x "$BUILD_DIR/bin/llama-cli" ]; then EXEC="$BUILD_DIR/bin/llama-cli"; fi
 if [ -x "$BUILD_DIR/main" ]; then EXEC="$BUILD_DIR/main"; fi
+if [ -x "$BUILD_DIR/bin/llama-cli" ]; then EXEC="$BUILD_DIR/bin/llama-cli"; fi
 if [ -n "$EXEC" ] && [ ! -x "$EXEC" ]; then EXEC=""; fi
 if [ -z "$EXEC" ]; then
   if [ -d "$BUILD_DIR/bin" ]; then
@@ -99,11 +70,10 @@ CMD_OK=0
 set +e
 for args in "-m \"$DEST\" -p \"Hello\" -n 8" \
             "-m \"$DEST\" --prompt \"Hello\" --n_predict 8" \
-            "-m \"$DEST\" --prompt \"Hello\" -n 8" \
             "-m \"$DEST\" --prompt \"Hello\" --max-tokens 8" \
             "-m \"$DEST\" -t 1 -n 8"; do
   echo "[TRY] $EXEC $args"
-  eval run_with_timeout 10 "$EXEC" $args 2>&1 | sed -n '1,120p'
+  eval timeout 10s "$EXEC" $args 2>&1 | sed -n '1,120p'
   rc=$?
   if [ $rc -eq 0 ] || [ $rc -eq 124 ]; then
     CMD_OK=1
@@ -123,7 +93,7 @@ fi
 
 echo "[STEP] 成功パターンで30秒間ストリーミング読み取りを試します..."
 # run with sample args and capture 30s
-eval run_with_timeout 30 "$EXEC" $SUCCESS_ARGS 2>&1 | sed -n '1,200p'
+eval timeout 30s "$EXEC" $SUCCESS_ARGS 2>&1 | sed -n '1,200p'
 
 echo "[DONE] 出力サンプル完了."
 echo "Models dir:"
