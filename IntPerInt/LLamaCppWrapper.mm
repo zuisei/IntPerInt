@@ -357,7 +357,23 @@ static NSString *EnsureManagedRuntimeAndInstall(NSString *execSrcPath) {
             @try { 
                 [task launch]; 
                 NSLog(@"[IntPerInt] Task launched successfully, waiting for completion...");
-                [task waitUntilExit]; 
+                
+                // Set up timeout for long-running tasks (30 seconds)
+                dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 30.0 * NSEC_PER_SEC);
+                dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+                
+                dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                    [task waitUntilExit];
+                    dispatch_semaphore_signal(semaphore);
+                });
+                
+                long timeoutResult = dispatch_semaphore_wait(semaphore, timeout);
+                if (timeoutResult != 0) {
+                    NSLog(@"[IntPerInt] Task timed out after 30 seconds, terminating...");
+                    [task terminate];
+                    [task waitUntilExit];
+                }
+                
                 NSLog(@"[IntPerInt] Task completed with status: %d", task.terminationStatus);
             }
             @catch (NSException *e) { 
@@ -372,13 +388,18 @@ static NSString *EnsureManagedRuntimeAndInstall(NSString *execSrcPath) {
 
             NSLog(@"[IntPerInt] stdout length: %lu bytes", (unsigned long)outData.length);
             NSLog(@"[IntPerInt] stderr length: %lu bytes", (unsigned long)errData.length);
-            if (outStr.length > 0) NSLog(@"[IntPerInt] stdout preview: %@", [outStr length] > 200 ? [[outStr substringToIndex:200] stringByAppendingString:@"..."] : outStr);
+            if (outStr.length > 0) {
+                NSString *preview = [outStr length] > 200 ? [[outStr substringToIndex:200] stringByAppendingString:@"..."] : outStr;
+                NSLog(@"[IntPerInt] stdout preview: %@", preview);
+            }
             if (errStr.length > 0) NSLog(@"[IntPerInt] stderr content: %@", errStr);
 
             if (!launchFailed && task.terminationStatus == 0) {
-                NSLog(@"[IntPerInt] Task succeeded, returning output");
+                NSLog(@"[IntPerInt] Task succeeded, returning output (%lu characters)", (unsigned long)outStr.length);
                 dispatch_async(dispatch_get_main_queue(), ^{ completion(outStr, nil); });
                 return;
+            } else if (task.terminationStatus != 0) {
+                NSLog(@"[IntPerInt] Task failed with exit code: %d", task.terminationStatus);
             }
 
             // Fallback: if bundled exec failed, try system Homebrew llama-cli
