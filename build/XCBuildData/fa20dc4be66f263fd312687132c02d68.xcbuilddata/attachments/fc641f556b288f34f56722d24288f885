@@ -1,0 +1,178 @@
+{
+  "" : {
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/IntPerInt-master.dia",
+    "emit-module-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/IntPerInt-master-emit-module.d",
+    "emit-module-diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/IntPerInt-master-emit-module.dia",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/IntPerInt-master.swiftdeps"
+  },
+  "/Users/0xt4/Projects/IntPerInt/IntPerInt/ContentView.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ContentView.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ContentView.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ContentView.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ContentView.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ContentView.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ContentView.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ContentView.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ContentView~partial.swiftmodule"
+  },
+  "/Users/0xt4/Projects/IntPerInt/IntPerInt/Engines/LLMEngine.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LLMEngine.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LLMEngine.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LLMEngine.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LLMEngine.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LLMEngine.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LLMEngine.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LLMEngine.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LLMEngine~partial.swiftmodule"
+  },
+  "/Users/0xt4/Projects/IntPerInt/IntPerInt/Engines/LlamaCppEngine.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppEngine.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppEngine.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppEngine.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppEngine.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppEngine.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppEngine.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppEngine.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppEngine~partial.swiftmodule"
+  },
+  "/Users/0xt4/Projects/IntPerInt/IntPerInt/Engines/LlamaCppLibEngine.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppLibEngine.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppLibEngine.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppLibEngine.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppLibEngine.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppLibEngine.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppLibEngine.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppLibEngine.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppLibEngine~partial.swiftmodule"
+  },
+  "/Users/0xt4/Projects/IntPerInt/IntPerInt/IntPerIntApp.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/IntPerIntApp.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/IntPerIntApp.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/IntPerIntApp.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/IntPerIntApp.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/IntPerIntApp.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/IntPerIntApp.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/IntPerIntApp.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/IntPerIntApp~partial.swiftmodule"
+  },
+  "/Users/0xt4/Projects/IntPerInt/IntPerInt/ModelManager.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ModelManager.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ModelManager.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ModelManager.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ModelManager.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ModelManager.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ModelManager.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ModelManager.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ModelManager~partial.swiftmodule"
+  },
+  "/Users/0xt4/Projects/IntPerInt/IntPerInt/Models.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/Models.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/Models.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/Models.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/Models.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/Models.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/Models.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/Models.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/Models~partial.swiftmodule"
+  },
+  "/Users/0xt4/Projects/IntPerInt/IntPerInt/Models/InstalledModel.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/InstalledModel.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/InstalledModel.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/InstalledModel.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/InstalledModel.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/InstalledModel.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/InstalledModel.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/InstalledModel.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/InstalledModel~partial.swiftmodule"
+  },
+  "/Users/0xt4/Projects/IntPerInt/IntPerInt/Runtime/RuntimeManager.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/RuntimeManager.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/RuntimeManager.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/RuntimeManager.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/RuntimeManager.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/RuntimeManager.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/RuntimeManager.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/RuntimeManager.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/RuntimeManager~partial.swiftmodule"
+  },
+  "/Users/0xt4/Projects/IntPerInt/IntPerInt/Services/DownloadDelegate.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/DownloadDelegate.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/DownloadDelegate.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/DownloadDelegate.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/DownloadDelegate.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/DownloadDelegate.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/DownloadDelegate.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/DownloadDelegate.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/DownloadDelegate~partial.swiftmodule"
+  },
+  "/Users/0xt4/Projects/IntPerInt/IntPerInt/Shared/RuntimeEnv.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/RuntimeEnv.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/RuntimeEnv.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/RuntimeEnv.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/RuntimeEnv.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/RuntimeEnv.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/RuntimeEnv.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/RuntimeEnv.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/RuntimeEnv~partial.swiftmodule"
+  },
+  "/Users/0xt4/Projects/IntPerInt/IntPerInt/Storage/ConversationStore.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ConversationStore.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ConversationStore.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ConversationStore.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ConversationStore.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ConversationStore.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ConversationStore.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ConversationStore.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ConversationStore~partial.swiftmodule"
+  },
+  "/Users/0xt4/Projects/IntPerInt/IntPerInt/Utils/LlamaCLIResolver.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCLIResolver.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCLIResolver.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCLIResolver.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCLIResolver.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCLIResolver.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCLIResolver.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCLIResolver.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCLIResolver~partial.swiftmodule"
+  },
+  "/Users/0xt4/Projects/IntPerInt/IntPerInt/Utils/ModelValidator.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ModelValidator.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ModelValidator.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ModelValidator.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ModelValidator.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ModelValidator.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ModelValidator.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ModelValidator.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ModelValidator~partial.swiftmodule"
+  },
+  "/Users/0xt4/Projects/IntPerInt/IntPerInt/Views/DiagnosticsView.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/DiagnosticsView.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/DiagnosticsView.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/DiagnosticsView.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/DiagnosticsView.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/DiagnosticsView.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/DiagnosticsView.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/DiagnosticsView.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/DiagnosticsView~partial.swiftmodule"
+  },
+  "/Users/0xt4/Projects/IntPerInt/IntPerInt/Views/WelcomeAndModelDownload.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/WelcomeAndModelDownload.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/WelcomeAndModelDownload.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/WelcomeAndModelDownload.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/WelcomeAndModelDownload.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/WelcomeAndModelDownload.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/WelcomeAndModelDownload.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/WelcomeAndModelDownload.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/WelcomeAndModelDownload~partial.swiftmodule"
+  },
+  "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "const-values" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/GeneratedAssetSymbols.swiftconstvalues",
+    "dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/GeneratedAssetSymbols.d",
+    "diagnostics" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/GeneratedAssetSymbols.dia",
+    "index-unit-output-path" : "/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/GeneratedAssetSymbols.o",
+    "swift-dependencies" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/GeneratedAssetSymbols.swiftdeps",
+    "swiftmodule" : "/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/GeneratedAssetSymbols~partial.swiftmodule"
+  }
+}
