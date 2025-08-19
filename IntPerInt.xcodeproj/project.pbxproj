@@ -71,6 +71,28 @@
 		};
 /* End PBXFrameworksBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		BB9999002F00000000000001 /* Bundle llama.cpp runtime */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/runtime/.bundled-llama.stamp",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\nRUNTIME_DIR=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/runtime\"\nBIN_DIR=\"$RUNTIME_DIR/bin\"\nSHARE_DIR=\"$RUNTIME_DIR/share/llama.cpp\"\nSTAMP=\"${SCRIPT_OUTPUT_FILE_0:-$RUNTIME_DIR/.bundled-llama.stamp}\"\nmkdir -p \"$BIN_DIR\" \"$SHARE_DIR\"\n# pick executable\nEXEC_SRC=\"\"\nfor p in \\\n  /opt/homebrew/opt/llama.cpp/bin/llama-cli \\\n  /opt/homebrew/opt/llama.cpp/bin/llama \\\n  /usr/local/opt/llama.cpp/bin/llama-cli \\\n  /usr/local/opt/llama.cpp/bin/llama; do\n  if [ -x \"$p\" ]; then EXEC_SRC=\"$p\"; break; fi\ndone\nif [ -z \"$EXEC_SRC\" ]; then WH=\"$(/usr/bin/which llama-cli 2>/dev/null || true)\"; [ -n \"$WH\" ] && EXEC_SRC=\"$WH\"; fi\nif [ -z \"$EXEC_SRC\" ]; then WH=\"$(/usr/bin/which llama 2>/dev/null || true)\"; [ -n \"$WH\" ] && EXEC_SRC=\"$WH\"; fi\nif [ -n \"$EXEC_SRC\" ]; then\n  BASENAME=\"$(basename \"$EXEC_SRC\")\"\n  rsync -a \"$EXEC_SRC\" \"$BIN_DIR/$BASENAME\" || true\n  chmod 755 \"$BIN_DIR/$BASENAME\" || true\nfi\n# metallib\nfor m in \\\n  /opt/homebrew/opt/llama.cpp/share/llama.cpp/default.metallib \\\n  /usr/local/opt/llama.cpp/share/llama.cpp/default.metallib; do\n  if [ -f \"$m\" ]; then rsync -a \"$m\" \"$SHARE_DIR/default.metallib\" || true; break; fi\ndone\n# stamp\nmkdir -p \"$(dirname \"$STAMP\")\"\n: > \"$STAMP\"\nexit 0\n";
+			shellScript = "set -euo pipefail\nRUNTIME_DIR=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/runtime\"\nBIN_DIR=\"$RUNTIME_DIR/bin\"\nSHARE_DIR=\"$RUNTIME_DIR/share/llama.cpp\"\nSTAMP=\"${SCRIPT_OUTPUT_FILE_0:-$RUNTIME_DIR/.bundled-llama.stamp}\"\nmkdir -p \"$BIN_DIR\" \"$SHARE_DIR\"\n# pick executable\nEXEC_SRC=\"\"\nfor p in \\\n  /opt/homebrew/opt/llama.cpp/bin/llama-cli \\\n  /opt/homebrew/opt/llama.cpp/bin/llama \\\n  /usr/local/opt/llama.cpp/bin/llama-cli \\\n  /usr/local/opt/llama.cpp/bin/llama; do\n  if [ -x \"$p\" ]; then EXEC_SRC=\"$p\"; break; fi\ndone\nif [ -z \"$EXEC_SRC\" ]; then WH=\"$(/usr/bin/which llama-cli 2>/dev/null || true)\"; [ -n \"$WH\" ] && EXEC_SRC=\"$WH\"; fi\nif [ -z \"$EXEC_SRC\" ]; then WH=\"$(/usr/bin/which llama 2>/dev/null || true)\"; [ -n \"$WH\" ] && EXEC_SRC=\"$WH\"; fi\nif [ -n \"$EXEC_SRC\" ]; then\n  BASENAME=\"$(basename \"$EXEC_SRC\")\"\n  rsync -a \"$EXEC_SRC\" \"$BIN_DIR/$BASENAME\" || true\n  chmod 755 \"$BIN_DIR/$BASENAME\" || true\nfi\n# metallib: try exec-local and common locations\nCANDS=()\nif [ -n \"$EXEC_SRC\" ]; then\n  EXECDIR=\"$(dirname \"$EXEC_SRC\")\"\n  PREFIX=\"$(dirname \"$EXECDIR\")\"\n  CANDS+=(\"$EXECDIR/default.metallib\")\n  CANDS+=(\"$PREFIX/share/llama.cpp/default.metallib\")\nfi\nCANDS+=(\"/opt/homebrew/opt/llama.cpp/share/llama.cpp/default.metallib\")\nCANDS+=(\"/usr/local/opt/llama.cpp/share/llama.cpp/default.metallib\")\nfor m in /opt/homebrew/Cellar/llama.cpp/*/share/llama.cpp/default.metallib /usr/local/Cellar/llama.cpp/*/share/llama.cpp/default.metallib; do\n  [ -e \"$m\" ] && CANDS+=(\"$m\") || true\ndone\nfor m in \"${CANDS[@]}\"; do\n  if [ -f \"$m\" ]; then rsync -a \"$m\" \"$SHARE_DIR/default.metallib\" || true; break; fi\ndone\n# stamp\nmkdir -p \"$(dirname \"$STAMP\")\"\n: > \"$STAMP\"\nexit 0\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXGroup section */
 		BB35A8922E51927F0045600E = {
 			isa = PBXGroup;
@@ -101,6 +123,7 @@
 			buildPhases = (
 				BB35A8972E51927F0045600E /* Sources */,
 				BB35A8982E51927F0045600E /* Frameworks */,
+				BB9999002F00000000000001 /* Bundle llama.cpp runtime */,
 				BB35A8992E51927F0045600E /* Resources */,
 			);
 			buildRules = (
@@ -382,6 +405,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"IntPerInt/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = IntPerInt;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
@@ -411,6 +435,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"IntPerInt/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = IntPerInt;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";

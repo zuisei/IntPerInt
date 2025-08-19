@@ -1,0 +1,14 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build IntPerInt (xcodebuild)",
+			"type": "shell",
+			"command": "xcodebuild -project IntPerInt.xcodeproj -scheme IntPerInt -configuration Debug -sdk macosx -quiet build",
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build"
+		}
+	]
+}

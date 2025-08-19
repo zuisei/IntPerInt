@@ -205,7 +205,9 @@ struct ModelDownloadView: View {
             for item in providers {
                 _ = item.loadObject(ofClass: URL.self) { url, _ in
                     guard let url else { return }
-                    try? modelManager.importLocalModel(from: url)
+                    Task { @MainActor in
+                        try? modelManager.importLocalModel(from: url)
+                    }
                 }
             }
             return true
