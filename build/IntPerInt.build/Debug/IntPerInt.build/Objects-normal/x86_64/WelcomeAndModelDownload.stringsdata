@@ -1,0 +1,232 @@
+{
+  "source": "/Users/0xt4/Projects/IntPerInt/IntPerInt/Views/WelcomeAndModelDownload.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Welcome to IntPerInt",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 18
+        }
+      },
+      {
+        "comment": "",
+        "key": "ローカル LLM とクラウドを統合した、あなたの macOS アシスタント",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 20
+        }
+      },
+      {
+        "comment": "",
+        "key": "今すぐ開始",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 28
+        }
+      },
+      {
+        "comment": "",
+        "key": "既にローカルモデルをお持ちの場合は、すぐにチャットを始められます。",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 30
+        }
+      },
+      {
+        "comment": "",
+        "key": "開始",
+        "location": {
+          "startingColumn": 63,
+          "startingLine": 42
+        }
+      },
+      {
+        "comment": "",
+        "key": "ローカルモデルが必要です",
+        "location": {
+          "startingColumn": 74,
+          "startingLine": 42
+        }
+      },
+      {
+        "comment": "",
+        "key": "今すぐ開始",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 37
+        }
+      },
+      {
+        "comment": "",
+        "key": "モデルを入手",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 51
+        }
+      },
+      {
+        "comment": "",
+        "key": "推奨 GGUF モデルをカタログからダウンロードするか、フォルダを開いて手動で配置できます。",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 53
+        }
+      },
+      {
+        "comment": "",
+        "key": "モデルをダウンロード",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 60
+        }
+      },
+      {
+        "comment": "",
+        "key": "フォルダを開く",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 67
+        }
+      },
+      {
+        "comment": "",
+        "key": "モデルを削除しますか？",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 215
+        }
+      },
+      {
+        "comment": "",
+        "key": "検索",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 152
+        }
+      },
+      {
+        "comment": "",
+        "key": "インストール済み 合計 %@ GB",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 142
+        }
+      },
+      {
+        "comment": "",
+        "key": "モデルをダウンロード",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 136
+        }
+      },
+      {
+        "comment": "",
+        "key": "最小化",
+        "location": {
+          "startingColumn": 129,
+          "startingLine": 163
+        }
+      },
+      {
+        "comment": "",
+        "key": "閉じる",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 165
+        }
+      },
+      {
+        "comment": "",
+        "key": "インストール済み",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 180
+        }
+      },
+      {
+        "comment": "",
+        "key": "カタログ",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 189
+        }
+      },
+      {
+        "comment": "",
+        "key": "削除",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 216
+        }
+      },
+      {
+        "comment": "",
+        "key": "キャンセル",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 220
+        }
+      },
+      {
+        "comment": "",
+        "key": "· %@",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 243
+        }
+      },
+      {
+        "comment": "",
+        "key": "インストール済み",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 249
+        }
+      },
+      {
+        "comment": "",
+        "key": "未ダウンロード",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 262
+        }
+      },
+      {
+        "comment": "",
+        "key": "%@ / %@ GB",
+        "location": {
+          "startingColumn": 48,
+          "startingLine": 255
+        }
+      },
+      {
+        "comment": "",
+        "key": "ETA %@",
+        "location": {
+          "startingColumn": 113,
+          "startingLine": 256
+        }
+      },
+      {
+        "comment": "",
+        "key": "· %@ GB",
+        "location": {
+          "startingColumn": 61,
+          "startingLine": 300
+        }
+      },
+      {
+        "comment": "",
+        "key": "· 更新 %@",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 302
+        }
+      }
+    ]
+  },
+  "version": 1
+}

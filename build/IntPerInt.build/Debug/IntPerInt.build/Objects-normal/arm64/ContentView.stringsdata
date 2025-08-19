@@ -1,0 +1,248 @@
+{
+  "source": "/Users/0xt4/Projects/IntPerInt/IntPerInt/ContentView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "New Chat",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 25
+        }
+      },
+      {
+        "comment": "",
+        "key": "Search",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 35
+        }
+      },
+      {
+        "comment": "",
+        "key": "Model",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 72
+        }
+      },
+      {
+        "comment": "",
+        "key": "推奨 GGUF モデルをカタログから取得",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 157
+        }
+      },
+      {
+        "comment": "",
+        "key": "None",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 121
+        }
+      },
+      {
+        "comment": "",
+        "key": "Installed (%.0fMB)",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 131
+        }
+      },
+      {
+        "comment": "",
+        "key": "Remote",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 136
+        }
+      },
+      {
+        "comment": "",
+        "key": "モデルをダウンロード",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 154
+        }
+      },
+      {
+        "comment": "",
+        "key": "設定",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 168
+        }
+      },
+      {
+        "comment": "",
+        "key": "診断",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 186
+        }
+      },
+      {
+        "comment": "",
+        "key": "ダウンロード",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 235
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld件進行中",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 237
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 272
+        }
+      },
+      {
+        "comment": "",
+        "key": "⌘⏎ で送信 • Shift+Enterで改行",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 503
+        }
+      },
+      {
+        "comment": "",
+        "key": "Ask anything",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 443
+        }
+      },
+      {
+        "comment": "",
+        "key": "Download",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 537
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 530
+        }
+      },
+      {
+        "comment": "",
+        "key": "You",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 568
+        }
+      },
+      {
+        "comment": "",
+        "key": "Assistant",
+        "location": {
+          "startingColumn": 47,
+          "startingLine": 568
+        }
+      },
+      {
+        "comment": "",
+        "key": "設定",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 635
+        }
+      },
+      {
+        "comment": "",
+        "key": "通常は自動セットアップされます。問題がある場合のみ手動指定してください。例: /opt/homebrew/opt/llama.cpp/bin/llama-cli",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 636
+        }
+      },
+      {
+        "comment": "",
+        "key": "/path/to/llama または llama-cli",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 639
+        }
+      },
+      {
+        "comment": "",
+        "key": "保存",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 641
+        }
+      },
+      {
+        "comment": "",
+        "key": "参照…",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 646
+        }
+      },
+      {
+        "comment": "",
+        "key": "アプリに取り込む",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 647
+        }
+      },
+      {
+        "comment": "",
+        "key": "検出/テスト",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 651
+        }
+      },
+      {
+        "comment": "",
+        "key": "自動検出",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 680
+        }
+      },
+      {
+        "comment": "",
+        "key": "よくあるパスから自動検出します",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 681
+        }
+      },
+      {
+        "comment": "",
+        "key": "自動セットアップ",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 682
+        }
+      },
+      {
+        "comment": "",
+        "key": "検出できたCLIをアプリ内に取り込み、設定を自動保存します",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 683
+        }
+      }
+    ]
+  },
+  "version": 1
+}
