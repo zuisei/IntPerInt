@@ -142,7 +142,14 @@ struct ContentView: View {
 
                     // Welcome 以外からもダウンロード画面を開けるボタン
                     Button {
-                        showModelDownload = true; isDownloadMinimized = false
+                        // 相互排他：他のオーバーレイを閉じてから開く（次ランループで反映）
+                        let open = {
+                            self.showModelDownload = true
+                            self.isDownloadMinimized = false
+                        }
+                        self.showSettings = false
+                        self.showDiagnostics = false
+                        DispatchQueue.main.async { open() }
                     } label: {
                         Label("モデルをダウンロード", systemImage: "arrow.down.circle")
                     }
@@ -151,7 +158,12 @@ struct ContentView: View {
 
                     // 設定（LLAMACPP_CLI）
                     Button {
-                        showSettings.toggle()
+                        // 相互排他（次ランループで反映）
+                        self.showDiagnostics = false
+                        DispatchQueue.main.async {
+                            self.showModelDownload = false
+                            self.showSettings.toggle()
+                        }
                     } label: {
                         Label("設定", systemImage: "gearshape")
                     }
@@ -160,10 +172,16 @@ struct ContentView: View {
                         SettingsPopover()
                             .frame(width: 380)
                             .padding(16)
+                            .transaction { $0.disablesAnimations = true }
                     }
 
                     Button {
-                        showDiagnostics.toggle()
+                        // 相互排他（次ランループで反映）
+                        self.showSettings = false
+                        DispatchQueue.main.async {
+                            self.showModelDownload = false
+                            self.showDiagnostics.toggle()
+                        }
                     } label: {
                         Label("診断", systemImage: "stethoscope")
                     }
@@ -246,7 +264,7 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             .zIndex(1000)
             .transition(.move(edge: .top).combined(with: .opacity))
-            .animation(.spring(response: 0.3, dampingFraction: 0.85), value: showModelDownload)
+            .transaction { $0.disablesAnimations = true }
         }
     }
     // Hidden global Command-Q handler (active in all states, including overlays)
@@ -615,23 +633,28 @@ private struct SettingsPopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("設定").font(.headline)
-            Text("llama.cpp CLI のフルパスを指定 (例: /opt/homebrew/bin/llama-cli)")
+            Text("通常は自動セットアップされます。問題がある場合のみ手動指定してください。例: /opt/homebrew/opt/llama.cpp/bin/llama-cli")
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
-                TextField("/path/to/llama-cli", text: $cliPath)
+                TextField("/path/to/llama または llama-cli", text: $cliPath)
                     .textFieldStyle(.roundedBorder)
                 Button("保存") {
-                    UserDefaults.standard.set(cliPath, forKey: "LLAMACPP_CLI")
+                    let norm = normalizeCLIPath(cliPath)
+                    UserDefaults.standard.set(norm, forKey: "LLAMACPP_CLI")
+                    cliPath = norm
                 }
                 Button("参照…") { browseForCLI() }
                 Button("アプリに取り込む") { installIntoAppBin() }
-                    .disabled(!FileManager.default.isExecutableFile(atPath: cliPath.trimmingCharacters(in: .whitespacesAndNewlines)))
+                    .disabled(!FileManager.default.isExecutableFile(atPath: normalizeCLIPath(cliPath)))
             }
             HStack {
                 Button("検出/テスト") {
-                    let trimmed = cliPath.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if FileManager.default.isExecutableFile(atPath: trimmed) {
-                        if let ver = runVersion(bin: trimmed) {
+                    let norm = normalizeCLIPath(cliPath)
+                    // 相対パスは弾く
+                    if !norm.hasPrefix("/") {
+                        testResult = "NG: 相対パスです。絶対パスを指定してください"
+                    } else if FileManager.default.isExecutableFile(atPath: norm) {
+                        if let ver = runVersion(bin: norm) {
                             testResult = "OK: " + ver
                         } else {
                             testResult = "OK: 実行可能 (version取得不可)"
@@ -639,9 +662,10 @@ private struct SettingsPopover: View {
                     } else {
                         // 未設定なら自動検出→テスト
                         if let found = autoDetectCLIReturnPath() {
-                            cliPath = found
-                            UserDefaults.standard.set(found, forKey: "LLAMACPP_CLI")
-                            if let ver = runVersion(bin: found) {
+                            let use = normalizeCLIPath(found)
+                            cliPath = use
+                            UserDefaults.standard.set(use, forKey: "LLAMACPP_CLI")
+                            if let ver = runVersion(bin: use) {
                                 testResult = "OK: " + ver
                             } else {
                                 testResult = "OK: 実行可能 (version取得不可)"
@@ -655,6 +679,8 @@ private struct SettingsPopover: View {
                 Spacer()
                 Button("自動検出") { autoDetectCLI() }
                     .help("よくあるパスから自動検出します")
+                Button("自動セットアップ") { performAutoSetup() }
+                    .help("検出できたCLIをアプリ内に取り込み、設定を自動保存します")
             }
         }
     }
@@ -673,10 +699,55 @@ private struct SettingsPopover: View {
         }
     }
 
+    private func performAutoSetup() {
+        let fm = FileManager.default
+        // 1) 既存設定が実行可能ならそれでOK
+        let current = URL(fileURLWithPath: normalizeCLIPath(cliPath)).resolvingSymlinksInPath().path
+        if fm.isExecutableFile(atPath: current) {
+            UserDefaults.standard.set(current, forKey: "LLAMACPP_CLI")
+            testResult = runVersion(bin: current).map { "OK: " + $0 } ?? "OK: 実行可能"
+            return
+        }
+        // 2) 候補から探す
+        let candidates = LlamaCLIResolver.candidates()
+        guard let raw = candidates.first(where: { fm.isExecutableFile(atPath: $0) }) else {
+            testResult = "NG: CLIが見つかりません。brew install llama.cpp を試してください"
+            return
+        }
+        let src = URL(fileURLWithPath: raw).resolvingSymlinksInPath().path
+        // 3) アプリ内に取り込み
+        guard let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
+        let binDir = base.appendingPathComponent("IntPerInt/bin", isDirectory: true)
+        do { try fm.createDirectory(at: binDir, withIntermediateDirectories: true) } catch { testResult = "NG: コピー先作成失敗"; return }
+        let dst = binDir.appendingPathComponent("llama-cli")
+        do {
+            if src != dst.path {
+                if fm.fileExists(atPath: dst.path) { try? fm.removeItem(at: dst) }
+                try fm.copyItem(at: URL(fileURLWithPath: src), to: dst)
+                _ = try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dst.path)
+            }
+            // default.metallib も同梱（見つかった場合）
+            if let metal = locateDefaultMetallib(nearExec: URL(fileURLWithPath: src)) {
+                let tgt = binDir.appendingPathComponent("default.metallib")
+                if fm.fileExists(atPath: tgt.path) { try? fm.removeItem(at: tgt) }
+                try? fm.copyItem(at: metal, to: tgt)
+            }
+            UserDefaults.standard.set(dst.path, forKey: "LLAMACPP_CLI")
+            cliPath = dst.path
+            testResult = runVersion(bin: dst.path).map { "OK: アプリ内に取り込み済み (" + $0 + ")" } ?? "OK: アプリ内に取り込み済み"
+        } catch {
+            // フォールバック: コピーできない場合はソースパスを保存して使用
+            UserDefaults.standard.set(src, forKey: "LLAMACPP_CLI")
+            cliPath = src
+            testResult = runVersion(bin: src).map { "OK: 使用パス: " + $0 } ?? "OK: 使用パスを保存"
+        }
+    }
+
     private func autoDetectCLI() {
         if let found = autoDetectCLIReturnPath() {
-            cliPath = found
-            UserDefaults.standard.set(found, forKey: "LLAMACPP_CLI")
+            let use = normalizeCLIPath(found)
+            cliPath = use
+            UserDefaults.standard.set(use, forKey: "LLAMACPP_CLI")
             testResult = "OK: 実行可能"
         } else {
             testResult = "NG: 見つかりませんでした"
@@ -686,7 +757,7 @@ private struct SettingsPopover: View {
     // LlamaCLIResolverの候補セットを利用して堅牢に検出。パス入力が実行可能ならそれも優先。
     private func autoDetectCLIReturnPath() -> String? {
         let fm = FileManager.default
-        let trimmed = cliPath.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmed = normalizeCLIPath(cliPath)
         var candidates: [String] = []
         if fm.isExecutableFile(atPath: trimmed) { candidates.append(trimmed) }
         // 入力がディレクトリ（例: /opt/homebrew/Cellar/llama.cpp/<ver>/libexec や /bin）の場合も補完
@@ -694,6 +765,11 @@ private struct SettingsPopover: View {
         if fm.fileExists(atPath: trimmed, isDirectory: &isDir), isDir.boolValue {
             candidates.append(trimmed + "/llama-cli")
             candidates.append(trimmed + "/llama")
+            // Cellar のルートが指定された場合は llama.cpp サブディレクトリを走査
+            if trimmed.hasSuffix("/Cellar") || trimmed.hasSuffix("/Cellar/") {
+                let base = trimmed.hasSuffix("/") ? trimmed + "llama.cpp" : trimmed + "/llama.cpp"
+                candidates.append(contentsOf: cellarEnumerate(prefix: base))
+            }
         }
         // ユーティリティの候補（Cellar/libexecやApp Support/bin含む）
         candidates += LlamaCLIResolver.candidates()
@@ -712,7 +788,96 @@ private struct SettingsPopover: View {
                 }
             }
         }
-        return candidates.first(where: { fm.isExecutableFile(atPath: $0) })
+        // which フォールバック（PATH 上）
+        if let w1 = which("llama-cli") { candidates.append(w1) }
+        if let w2 = which("llama") { candidates.append(w2) }
+        if let hit = candidates.first(where: { fm.isExecutableFile(atPath: $0) }) {
+            return URL(fileURLWithPath: hit).resolvingSymlinksInPath().path
+        }
+        // 最終フォールバック: ディレクトリ深さ探索（Cellar配下など）
+        let roots: [String] = {
+            var r: [String] = []
+            if isDir.boolValue { r.append(trimmed) }
+            r.append("/opt/homebrew/Cellar/llama.cpp")
+            r.append("/usr/local/Cellar/llama.cpp")
+            return Array(Set(r))
+        }()
+        for root in roots {
+            if let found = deepSearchCLI(startDir: root, maxDepth: 4) { return found }
+        }
+        return nil
+    }
+
+    // /usr/bin/which を使って PATH から探索
+    private func which(_ name: String) -> String? {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        proc.arguments = [name]
+        let out = Pipe(); proc.standardOutput = out
+        do { try proc.run() } catch { return nil }
+        proc.waitUntilExit()
+        guard proc.terminationStatus == 0 else { return nil }
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        let s = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return s.isEmpty ? nil : s
+    }
+
+    // Cellar を手動で列挙
+    private func cellarEnumerate(prefix: String) -> [String] {
+        let fm = FileManager.default
+        var out: [String] = []
+        var isDir: ObjCBool = false
+        if fm.fileExists(atPath: prefix, isDirectory: &isDir), isDir.boolValue,
+           let entries = try? fm.contentsOfDirectory(atPath: prefix) {
+            let versions = entries.sorted { $0.compare($1, options: .numeric) == .orderedDescending }
+            for v in versions.prefix(5) {
+                let base = prefix + "/" + v
+                out.append(contentsOf: [
+                    base + "/bin/llama-cli",
+                    base + "/bin/llama",
+                    base + "/libexec/llama-cli",
+                    base + "/libexec/llama",
+                ])
+            }
+        }
+        return out
+    }
+
+    // 深さ制限の列挙で llama-cli/llama を探索
+    private func deepSearchCLI(startDir: String, maxDepth: Int) -> String? {
+        let fm = FileManager.default
+        var isDir: ObjCBool = false
+        guard fm.fileExists(atPath: startDir, isDirectory: &isDir), isDir.boolValue else { return nil }
+        let url = URL(fileURLWithPath: startDir)
+        let keys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey]
+        let opts: FileManager.DirectoryEnumerationOptions = [.skipsHiddenFiles]
+        guard let e = fm.enumerator(at: url, includingPropertiesForKeys: keys, options: opts) else { return nil }
+        while let next = e.nextObject() as? URL {
+            let rel = next.path.replacingOccurrences(of: url.path, with: "")
+            let depth = rel.split(separator: "/").count
+            if depth > maxDepth { e.skipDescendants(); continue }
+            let name = next.lastPathComponent
+            if name == "llama-cli" || name == "llama" {
+                let p = next.path
+                if fm.isExecutableFile(atPath: p) {
+                    return next.resolvingSymlinksInPath().path
+                }
+            }
+        }
+        return nil
+    }
+
+    // ユーザー入力のCLIパスを正規化（トリム/引用符除去/チルダ展開）
+    private func normalizeCLIPath(_ s: String) -> String {
+        var out = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        if out.hasPrefix("\"") && out.hasSuffix("\"") && out.count >= 2 {
+            out.removeFirst(); out.removeLast()
+        }
+        if out.hasPrefix("~") {
+            let home = FileManager.default.homeDirectoryForCurrentUser.path
+            out = home + String(out.dropFirst())
+        }
+        return out
     }
 
     // --version を実行して最初の行を返す
@@ -744,7 +909,7 @@ private struct SettingsPopover: View {
     // Application Support/IntPerInt/bin にCLIをコピーして固定化
     private func installIntoAppBin() {
         let fm = FileManager.default
-        let src = cliPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let src = URL(fileURLWithPath: normalizeCLIPath(cliPath)).resolvingSymlinksInPath().path
         guard fm.isExecutableFile(atPath: src) else { testResult = "NG: 実行不可/未設定"; return }
         guard let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
         let binDir = base.appendingPathComponent("IntPerInt/bin", isDirectory: true)
@@ -755,6 +920,12 @@ private struct SettingsPopover: View {
             try fm.copyItem(at: URL(fileURLWithPath: src), to: dst)
             // 実行権付与
             _ = try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dst.path)
+            // default.metallib も同梱（見つかった場合）
+            if let metal = locateDefaultMetallib(nearExec: URL(fileURLWithPath: src)) {
+                let tgt = binDir.appendingPathComponent("default.metallib")
+                if fm.fileExists(atPath: tgt.path) { try? fm.removeItem(at: tgt) }
+                try? fm.copyItem(at: metal, to: tgt)
+            }
             cliPath = dst.path
             UserDefaults.standard.set(dst.path, forKey: "LLAMACPP_CLI")
             if let ver = runVersion(bin: dst.path) {
@@ -763,8 +934,27 @@ private struct SettingsPopover: View {
                 testResult = "OK: アプリ内に取り込み済み"
             }
         } catch {
-            testResult = "NG: コピー失敗 (" + (error as NSError).localizedDescription + ")"
+            // コピーできない場合はフォールバックとして元のパスを保存
+            UserDefaults.standard.set(src, forKey: "LLAMACPP_CLI")
+            cliPath = src
+            if let ver = runVersion(bin: src) {
+                testResult = "OK: 使用パスを保存 (" + ver + ")"
+            } else {
+                testResult = "OK: 使用パスを保存"
+            }
         }
+    }
+
+    // default.metallib の検出（Cellar/opt 配置や実行ファイル直下）
+    private func locateDefaultMetallib(nearExec exec: URL) -> URL? {
+        let fm = FileManager.default
+        let execDir = exec.deletingLastPathComponent()
+        let share1 = execDir.deletingLastPathComponent().appendingPathComponent("share/llama.cpp")
+        let share2 = URL(fileURLWithPath: "/opt/homebrew/opt/llama.cpp/share/llama.cpp")
+        let share3 = URL(fileURLWithPath: "/usr/local/opt/llama.cpp/share/llama.cpp")
+        let candidates = [execDir, share1, share2, share3].map { $0.appendingPathComponent("default.metallib") }
+        for c in candidates { if fm.fileExists(atPath: c.path) { return c } }
+        return nil
     }
 }
 

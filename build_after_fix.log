@@ -1,0 +1,6 @@
+error: Sandbox: mkdir(79341) deny(1) file-write-create /Users/0xt4/Library/Developer/Xcode/DerivedData/IntPerInt-droxnoxejwlnnzcctvclnwowhmtn/Build/Products/Debug/IntPerInt.app/Contents/Resources/runtime/bin (in target 'IntPerInt' from project 'IntPerInt')
+error: Sandbox: mkdir(79341) deny(1) file-write-create /Users/0xt4/Library/Developer/Xcode/DerivedData/IntPerInt-droxnoxejwlnnzcctvclnwowhmtn/Build/Products/Debug/IntPerInt.app/Contents/Resources/runtime/share (in target 'IntPerInt' from project 'IntPerInt')
+mkdir: /Users/0xt4/Library/Developer/Xcode/DerivedData/IntPerInt-droxnoxejwlnnzcctvclnwowhmtn/Build/Products/Debug/IntPerInt.app/Contents/Resources/runtime/bin: Operation not permitted
+mkdir: /Users/0xt4/Library/Developer/Xcode/DerivedData/IntPerInt-droxnoxejwlnnzcctvclnwowhmtn/Build/Products/Debug/IntPerInt.app/Contents/Resources/runtime/share: Operation not permitted
+note: Removed stale file '/Users/0xt4/Library/Developer/Xcode/DerivedData/IntPerInt-droxnoxejwlnnzcctvclnwowhmtn/Build/Intermediates.noindex/IntPerInt.build/Debug/IntPerInt.build/4f3dba15bd6e2ae0efba47455b54834b.sb'
+

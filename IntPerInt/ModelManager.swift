@@ -56,12 +56,66 @@ class ModelManager: ObservableObject {
         modelsDirectory = appSupport.appendingPathComponent("IntPerInt/Models")
         try? FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
 
+    // パス未設定なら自動検出＋固定化（ユーザ入力不要に）
+    autoConfigureCLIIfNeeded()
+
         // load persisted conversations if any
         Task { await loadPersistedConversations() }
 
         // default selection
         selectedConversationID = conversations.first?.id
         messages = conversations.first?.messages ?? []
+    }
+
+    private func autoConfigureCLIIfNeeded() {
+        let defaults = UserDefaults.standard
+        if let existing = defaults.string(forKey: "LLAMACPP_CLI"), !existing.isEmpty { return }
+        let fm = FileManager.default
+        // 1) 環境変数優先
+        if let env = ProcessInfo.processInfo.environment["LLAMACPP_CLI"], fm.isExecutableFile(atPath: env) {
+            let real = URL(fileURLWithPath: env).resolvingSymlinksInPath().path
+            defaults.set(real, forKey: "LLAMACPP_CLI"); return
+        }
+        // 2) 候補から最初の実行可能を選択
+        var candidates = LlamaCLIResolver.candidates()
+        // PATH 上の which も試す
+        if let w1 = _which("llama-cli") { candidates.insert(w1, at: 0) }
+        if let w2 = _which("llama") { candidates.insert(w2, at: 0) }
+        if let raw = candidates.first(where: { fm.isExecutableFile(atPath: $0) }) {
+            let src = URL(fileURLWithPath: raw).resolvingSymlinksInPath().path
+            // 3) アプリ管理binへコピー（サンドボックス安定化）
+            if let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+                let binDir = base.appendingPathComponent("IntPerInt/bin", isDirectory: true)
+                try? fm.createDirectory(at: binDir, withIntermediateDirectories: true)
+                let dst = binDir.appendingPathComponent("llama-cli")
+                // 同一パスならコピー不要
+                if src != dst.path {
+                    if fm.fileExists(atPath: dst.path) { try? fm.removeItem(at: dst) }
+                    try? fm.copyItem(at: URL(fileURLWithPath: src), to: dst)
+                    _ = try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dst.path)
+                    defaults.set(dst.path, forKey: "LLAMACPP_CLI")
+                } else {
+                    defaults.set(dst.path, forKey: "LLAMACPP_CLI")
+                }
+                return
+            }
+            // フォールバック：そのまま保存
+            defaults.set(src, forKey: "LLAMACPP_CLI"); return
+        }
+        // 4) 見つからない場合は何もしない（診断/通知に委ねる）
+    }
+
+    private func _which(_ name: String) -> String? {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        p.arguments = [name]
+        let out = Pipe(); p.standardOutput = out
+        do { try p.run() } catch { return nil }
+        p.waitUntilExit()
+        guard p.terminationStatus == 0 else { return nil }
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        let s = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return s.isEmpty ? nil : s
     }
     
     func loadAvailableModels() {
@@ -345,13 +399,7 @@ class ModelManager: ObservableObject {
     }
 }
 
-// インストール済みモデルの情報
-struct InstalledModel: Identifiable, Hashable {
-    let id = UUID()
-    let name: String      // 表示名
-    let fileName: String  // 実ファイル名
-    let url: URL
-}
+// InstalledModel moved to Models/InstalledModel.swift
 
 // MARK: - Helpers
 extension ModelManager {
@@ -460,83 +508,20 @@ extension ModelManager {
 extension ModelManager {
     private func validateInstalledModels() {
         let candidates = self.installedModels
-        DispatchQueue.global(qos: .utility).async {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self else { return }
             var valid: [InstalledModel] = []
-            guard let cli = try? _ModelValidator.resolveLlamaCLI() else {
+            guard let cli = try? ModelValidator.resolveLlamaCLI() else {
                 DispatchQueue.main.async { self.validInstalledModels = [] }
                 return
             }
             for m in candidates {
-                if _ModelValidator.quickValidateBlocking(cliURL: cli, modelURL: m.url, timeoutSeconds: 8) {
+                if ModelValidator.quickValidateBlocking(cliURL: cli, modelURL: m.url, timeoutSeconds: 8) {
                     valid.append(m)
                 }
             }
             DispatchQueue.main.async { self.validInstalledModels = valid }
         }
-    }
-}
-
-// MARK: - Local validator utilities (non-actor isolated)
-private enum _ModelValidator {
-    static func resolveLlamaCLI() throws -> URL {
-        let fm = FileManager.default
-        var paths: [String] = []
-        if let env = ProcessInfo.processInfo.environment["LLAMACPP_CLI"], !env.isEmpty {
-            paths.append(contentsOf: expandIfDirectory(env))
-        }
-        // 統一候補群（brew bin/opt、Cellar/bin & libexec、App Support/bin、/tmpビルド など）
-        paths.append(contentsOf: LlamaCLIResolver.candidates())
-        for p in paths { if fm.isExecutableFile(atPath: p) { return URL(fileURLWithPath: p) } }
-        throw NSError(domain: "ModelValidator", code: 404, userInfo: [NSLocalizedDescriptionKey: "llama.cpp CLI not found. Set LLAMACPP_CLI or `brew install llama.cpp`."])
-    }
-
-    static func quickValidateBlocking(cliURL: URL, modelURL: URL, timeoutSeconds: Double = 8) -> Bool {
-        let proc = Process()
-        proc.executableURL = cliURL
-        proc.arguments = ["-m", modelURL.path, "-p", "test", "-n", "1"]
-        let errPipe = Pipe(); proc.standardError = errPipe
-        let outPipe = Pipe(); proc.standardOutput = outPipe
-        // Ensure ggml metal resource path so validation doesn't fail on default.metallib lookup
-        var env = ProcessInfo.processInfo.environment
-        if env["GGML_METAL_PATH_RESOURCES"] == nil {
-            env["GGML_METAL_PATH_RESOURCES"] = resolveMetalResourcesPath(defaultExecDir: cliURL.deletingLastPathComponent())
-        }
-        proc.environment = env
-        do { try proc.run() } catch { return false }
-        let start = Date()
-        while proc.isRunning {
-            if Date().timeIntervalSince(start) > timeoutSeconds {
-                proc.terminate()
-                break
-            }
-            Thread.sleep(forTimeInterval: 0.1)
-        }
-        return proc.terminationStatus == 0
-    }
-
-    // Minimal copy of engine's resolver to avoid project file wiring
-    private static func resolveMetalResourcesPath(defaultExecDir: URL) -> String {
-        let candidates: [URL] = [
-            defaultExecDir,
-            URL(fileURLWithPath: "/tmp/llama.cpp/build/bin"),
-            URL(fileURLWithPath: "/tmp/llama.cpp"),
-            URL(fileURLWithPath: "/opt/homebrew/opt/llama.cpp/share/llama.cpp"),
-            URL(fileURLWithPath: "/usr/local/opt/llama.cpp/share/llama.cpp")
-        ]
-        for dir in candidates {
-            let file = dir.appendingPathComponent("default.metallib")
-            if FileManager.default.fileExists(atPath: file.path) { return dir.path }
-        }
-        return defaultExecDir.path
-    }
-
-    private static func expandIfDirectory(_ path: String) -> [String] {
-        var out: [String] = [path]
-        var isDir: ObjCBool = false
-        if FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue {
-            out = [path + "/llama-cli", path + "/llama"]
-        }
-        return out
     }
 }
 
