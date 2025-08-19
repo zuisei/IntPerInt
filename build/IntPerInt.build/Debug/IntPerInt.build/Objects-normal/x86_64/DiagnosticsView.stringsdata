@@ -1,0 +1,56 @@
+{
+  "source": "/Users/0xt4/Projects/IntPerInt/IntPerInt/Views/DiagnosticsView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "診断 / ログ収集",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 12
+        }
+      },
+      {
+        "comment": "",
+        "key": "llama.cpp のバージョン確認や簡易テストを実行し、結果をログとして保存できます。",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 13
+        }
+      },
+      {
+        "comment": "",
+        "key": "モデルのローカルパスまたはURL (.gguf)",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 17
+        }
+      },
+      {
+        "comment": "",
+        "key": "バージョン確認",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 19
+        }
+      },
+      {
+        "comment": "",
+        "key": "モデルテスト",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 21
+        }
+      },
+      {
+        "comment": "",
+        "key": "ログを保存…",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 32
+        }
+      }
+    ]
+  },
+  "version": 1
+}

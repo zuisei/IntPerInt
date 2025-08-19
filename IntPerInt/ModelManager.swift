@@ -32,7 +32,7 @@ class ModelManager: ObservableObject {
     @Published var engineStatus: EngineStatus = .idle
 
     // Engine and task management
-    private var engine: LLMEngine = LlamaCppEngine()
+    private var engine: LLMEngine = LlamaCppLibEngine()
     private var currentModelPath: URL? = nil
     private var currentGenerationTask: Task<Void, Never>? = nil
     private let logger = Logger(subsystem: "com.example.IntPerInt", category: "ModelManager")
@@ -56,8 +56,7 @@ class ModelManager: ObservableObject {
         modelsDirectory = appSupport.appendingPathComponent("IntPerInt/Models")
         try? FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
 
-    // パス未設定なら自動検出＋固定化（ユーザ入力不要に）
-    autoConfigureCLIIfNeeded()
+    // CLIの自動検出は廃止（libエンジンを優先使用）
 
         // load persisted conversations if any
         Task { await loadPersistedConversations() }
@@ -67,56 +66,7 @@ class ModelManager: ObservableObject {
         messages = conversations.first?.messages ?? []
     }
 
-    private func autoConfigureCLIIfNeeded() {
-        let defaults = UserDefaults.standard
-        if let existing = defaults.string(forKey: "LLAMACPP_CLI"), !existing.isEmpty { return }
-        let fm = FileManager.default
-        // 1) 環境変数優先
-        if let env = ProcessInfo.processInfo.environment["LLAMACPP_CLI"], fm.isExecutableFile(atPath: env) {
-            let real = URL(fileURLWithPath: env).resolvingSymlinksInPath().path
-            defaults.set(real, forKey: "LLAMACPP_CLI"); return
-        }
-        // 2) 候補から最初の実行可能を選択
-        var candidates = LlamaCLIResolver.candidates()
-        // PATH 上の which も試す
-        if let w1 = _which("llama-cli") { candidates.insert(w1, at: 0) }
-        if let w2 = _which("llama") { candidates.insert(w2, at: 0) }
-        if let raw = candidates.first(where: { fm.isExecutableFile(atPath: $0) }) {
-            let src = URL(fileURLWithPath: raw).resolvingSymlinksInPath().path
-            // 3) アプリ管理binへコピー（サンドボックス安定化）
-            if let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-                let binDir = base.appendingPathComponent("IntPerInt/bin", isDirectory: true)
-                try? fm.createDirectory(at: binDir, withIntermediateDirectories: true)
-                let dst = binDir.appendingPathComponent("llama-cli")
-                // 同一パスならコピー不要
-                if src != dst.path {
-                    if fm.fileExists(atPath: dst.path) { try? fm.removeItem(at: dst) }
-                    try? fm.copyItem(at: URL(fileURLWithPath: src), to: dst)
-                    _ = try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dst.path)
-                    defaults.set(dst.path, forKey: "LLAMACPP_CLI")
-                } else {
-                    defaults.set(dst.path, forKey: "LLAMACPP_CLI")
-                }
-                return
-            }
-            // フォールバック：そのまま保存
-            defaults.set(src, forKey: "LLAMACPP_CLI"); return
-        }
-        // 4) 見つからない場合は何もしない（診断/通知に委ねる）
-    }
-
-    private func _which(_ name: String) -> String? {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        p.arguments = [name]
-        let out = Pipe(); p.standardOutput = out
-        do { try p.run() } catch { return nil }
-        p.waitUntilExit()
-        guard p.terminationStatus == 0 else { return nil }
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        let s = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return s.isEmpty ? nil : s
-    }
+    // 旧CLI検出系は撤去
     
     func loadAvailableModels() {
         // 推奨カタログ名（ダウンロード候補用）
@@ -147,7 +97,7 @@ class ModelManager: ObservableObject {
                         self?.downloadReceivedBytes[name] = written
                                             }
                                         },
-                                        onComplete: { [weak self] name, result in
+                                        onComplete: { [weak self] (name: String, result: Result<URL, Error>) in
                                             Task { @MainActor in
                                                 guard let self else { return }
                                                 self.downloadingModels.remove(name)
@@ -343,13 +293,14 @@ class ModelManager: ObservableObject {
         let candidate = modelsDirectory.appendingPathComponent(modelName)
         if FileManager.default.fileExists(atPath: candidate.path) {
             if currentModelPath?.path != candidate.path {
+                await MainActor.run { self.engineStatus = .loading(modelName: modelName) }
+                // libエンジンのみ使用
                 do {
-                    await MainActor.run { self.engineStatus = .loading(modelName: modelName) }
-                    var mutableEngine = engine
-                    try mutableEngine.load(modelPath: candidate)
-                    self.engine = mutableEngine
+                    var lib = LlamaCppLibEngine()
+                    try lib.load(modelPath: candidate)
+                    self.engine = lib
                     self.currentModelPath = candidate
-                    logger.info("REAL ENGINE LOADED (deferred) model path: \(candidate.path, privacy: .public)")
+                    logger.info("LIB ENGINE LOADED model path: \(candidate.path, privacy: .public)")
                     await MainActor.run {
                         self.engineStatus = .loaded(modelName: modelName)
                         self.postSystemNotification(key: "engine_loaded_\(modelName)", message: "モデルをロードしました: \(self.prettyName(for: modelName))", severity: .info, actions: [], throttleSeconds: 5, autoHideAfter: 5)
@@ -496,10 +447,7 @@ extension ModelManager {
 
     private func mapErrorToNotification(_ error: Error) -> (String, String, [SystemNotification.Action]) {
         let msg = error.localizedDescription
-        if msg.localizedCaseInsensitiveContains("llama.cpp CLI not found") || (error as NSError).code == 404 && (error as NSError).domain == "LlamaCppEngine" {
-            let text = "ローカルの llama.cpp CLI が見つかりません。次のいずれかを行ってください:\n1) Homebrewでインストール\n2) 設定で LLAMACPP_CLI を指定"
-            return ("cli_not_found", text, [.brewInstall, .openSettings])
-        }
+    // 旧CLI特有のエラー分岐は削除
         return ("generic_error", msg, [])
     }
 }
@@ -507,74 +455,9 @@ extension ModelManager {
 // MARK: - Model validation (llama.cpp quick check)
 extension ModelManager {
     private func validateInstalledModels() {
-        let candidates = self.installedModels
-        DispatchQueue.global(qos: .utility).async { [weak self] in
-            guard let self else { return }
-            var valid: [InstalledModel] = []
-            guard let cli = try? ModelValidator.resolveLlamaCLI() else {
-                DispatchQueue.main.async { self.validInstalledModels = [] }
-                return
-            }
-            for m in candidates {
-                if ModelValidator.quickValidateBlocking(cliURL: cli, modelURL: m.url, timeoutSeconds: 8) {
-                    valid.append(m)
-                }
-            }
-            DispatchQueue.main.async { self.validInstalledModels = valid }
-        }
+        // Until lib validation path is implemented, treat all installed models as selectable.
+        self.validInstalledModels = self.installedModels
     }
 }
 
-// MARK: - URLSessionDownloadDelegate helper for progress & completion
-private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
-    let modelName: String
-    let destinationURL: URL
-    // onProgress(name, progress(0-1), speedMBps, expectedBytes, totalBytesWritten)
-    let onProgress: (String, Double, Double, Int64, Int64) -> Void
-    let onComplete: (String, Result<URL, Error>) -> Void
-    private let startDate: Date
-
-    init(modelName: String,
-         destinationURL: URL,
-         onProgress: @escaping (String, Double, Double, Int64, Int64) -> Void,
-         onComplete: @escaping (String, Result<URL, Error>) -> Void) {
-        self.modelName = modelName
-        self.destinationURL = destinationURL
-        self.onProgress = onProgress
-        self.onComplete = onComplete
-        self.startDate = Date()
-    }
-
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        let expected = totalBytesExpectedToWrite
-        let progress: Double
-        if expected > 0 {
-            progress = Double(totalBytesWritten) / Double(expected)
-        } else {
-            // unknown total; map progress by logarithm to avoid 0% forever
-            progress = 0.0
-        }
-        let elapsed = Date().timeIntervalSince(startDate)
-        let speedMBps = elapsed > 0 ? (Double(totalBytesWritten) / 1_000_000.0) / elapsed : 0.0
-        onProgress(modelName, progress, speedMBps, expected, totalBytesWritten)
-    }
-
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        do {
-            // Replace existing file if present
-            if FileManager.default.fileExists(atPath: destinationURL.path) {
-                try FileManager.default.removeItem(at: destinationURL)
-            }
-            try FileManager.default.moveItem(at: location, to: destinationURL)
-            onComplete(modelName, .success(destinationURL))
-        } catch {
-            onComplete(modelName, .failure(error))
-        }
-    }
-
-    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if let error {
-            onComplete(modelName, .failure(error))
-        }
-    }
-}
+// DownloadDelegate is defined in Services/DownloadDelegate.swift
