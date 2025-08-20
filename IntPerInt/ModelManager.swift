@@ -69,10 +69,13 @@ class ModelManager: ObservableObject {
     // 旧CLI検出系は撤去
     
     func loadAvailableModels() {
-        // 推奨カタログ名（ダウンロード候補用）
+        // 推奨カタログ名（ダウンロード候補用）は即座に設定
         availableModels = ModelInfo.availableModels.map { $0.name }
-        // ローカル（インストール済み）スキャン
-        refreshInstalledModels()
+        
+        // ローカル（インストール済み）スキャンはバックグラウンドで実行
+        Task.detached(priority: .userInitiated) { @MainActor in
+            self.refreshInstalledModels()
+        }
     }
 
     var hasAnyLocalModel: Bool { !installedModels.isEmpty }
@@ -192,36 +195,39 @@ class ModelManager: ObservableObject {
     }
 
     func sendMessage(_ content: String, using modelName: String, provider: AIProvider) {
+        // 1. 即座にユーザーメッセージをUIに追加（UI応答性向上）
         let userMessage = ChatMessage(content: content, isUser: true)
         messages.append(userMessage)
         syncMessagesIntoSelectedConversation()
-
-        // cancel any existing generation
+        
+        // 2. 即座に生成状態をアクティブに（UIフィードバック）
+        isGenerating = true
+        
+        // 3. 既存生成をキャンセル
         currentGenerationTask?.cancel()
 
+        // 4. バックグラウンドで生成処理を開始（UIをブロックしない）
         currentGenerationTask = Task {
-            await MainActor.run { self.isGenerating = true }
-            logger.info("generation started, provider=\(String(describing: provider.rawValue), privacy: .public), promptLen=\(content.count)")
-
             let params = GenerationParams()
             let isCancelled: @Sendable () -> Bool = {
                 return Task.isCancelled
             }
 
             do {
-                // 初回送信直前にエンジン準備（実エンジンでロード）
-                try await prepareEngineIfNeeded()
+                // エンジン準備
+                try await self.prepareEngineIfNeeded()
 
-                _ = try await engine.generate(prompt: content, systemPrompt: nil, params: params, onToken: { token in
+                _ = try await self.engine.generate(prompt: content, systemPrompt: nil, params: params, onToken: { token in
                     Task { @MainActor in
-                        // append token to last assistant message (or create one)
+                        // ストリーミングでトークンを即座にUIに反映
                         if let last = self.messages.last, !last.isUser {
-                            // modify in place: remove last and append updated
+                            // 既存のアシスタントメッセージを更新
                             var updated = last
                             updated = ChatMessage(id: updated.id, content: updated.content + token, isUser: false, timestamp: updated.timestamp)
                             self.messages.removeLast()
                             self.messages.append(updated)
                         } else {
+                            // 新しいアシスタントメッセージを作成
                             let ai = ChatMessage(content: token, isUser: false)
                             self.messages.append(ai)
                         }
@@ -229,25 +235,29 @@ class ModelManager: ObservableObject {
                     }
                 }, isCancelled: isCancelled)
 
+                // 生成完了
                 await MainActor.run {
                     self.isGenerating = false
                     self.currentGenerationTask = nil
+                    self.logger.info("generation finished successfully")
                 }
-        logger.info("generation finished successfully")
             } catch {
                 await MainActor.run {
-                    // チャットには入れず、システム通知に出す
+                    // エラー処理：生成失敗時
                     self.isGenerating = false
                     self.currentGenerationTask = nil
-                    // 失敗時に、既にストリーム途中で挿入されたアシスタント気泡があれば取り消す
+                    
+                    // 途中で挿入されたアシスタントメッセージがあれば削除
                     if let last = self.messages.last, !last.isUser {
                         self.messages.removeLast()
                         self.syncMessagesIntoSelectedConversation()
                     }
+                    
+                    // システム通知でエラー表示
                     let (key, msg, actions) = self.mapErrorToNotification(error)
                     self.postSystemNotification(key: key, message: msg, severity: .error, actions: actions, throttleSeconds: 30)
+                    self.logger.error("Generation failed: \(error.localizedDescription, privacy: .public)")
                 }
-                logger.error("Generation failed: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -374,8 +384,8 @@ extension ModelManager {
     }
 
     func refreshInstalledModels() {
-        let contents = (try? FileManager.default.contentsOfDirectory(at: modelsDirectory, includingPropertiesForKeys: nil)) ?? []
-        let ggufs = contents.filter { $0.pathExtension == "gguf" }
+        guard let contents = try? FileManager.default.contentsOfDirectory(at: modelsDirectory, includingPropertiesForKeys: [.fileSizeKey], options: .skipsHiddenFiles) else { return }
+        let ggufs = contents.filter { $0.pathExtension.lowercased() == "gguf" }
         let built: [InstalledModel] = ggufs.map { url in
             let file = url.lastPathComponent
             return InstalledModel(name: prettyName(for: file), fileName: file, url: url)
@@ -393,8 +403,8 @@ extension ModelManager {
         }
         installedTotalBytes = total
 
-    // インストール済みから有効モデルを検証・抽出
-    validateInstalledModels()
+        // インストール済みから有効モデルを検証・抽出
+        validateInstalledModels()
     }
 
     private func prettyName(for fileName: String) -> String {

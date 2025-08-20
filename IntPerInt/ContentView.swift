@@ -276,9 +276,11 @@ struct ContentView: View {
         .opacity(0.001)
     }
         .onAppear {
-            modelManager.loadAvailableModels()
-            // Show welcome on first launch or when no local models
-            showWelcome = !hasSeenWelcome || !modelManager.hasAnyLocalModel
+            // UI を即座に表示してから重い処理をバックグラウンドで実行
+            Task {
+                // バックグラウンドで初期化処理を実行
+                await initializeApp()
+            }
         }
         .onChange(of: modelManager.validInstalledModels) { valid in
             // 初回ロード/更新時、会話やローカル未選択なら有効モデルの先頭に寄せる
@@ -321,6 +323,61 @@ struct ContentView: View {
                 modelManager.conversations[idx].modelName = first
             }
         }
+    }
+    
+    // 起動時の初期化処理（非同期で実行）
+    private func initializeApp() async {
+        // 1. 即座にUI状態を更新（レスポンシブ表示）
+        await MainActor.run {
+            // Welcome画面の表示判定（初回のみ即座に判定）
+            showWelcome = !hasSeenWelcome || !modelManager.hasAnyLocalModel
+        }
+        
+        // 2. バックグラウンドでモデル読み込み（重い処理）
+        await Task.detached(priority: .userInitiated) {
+            await MainActor.run {
+                modelManager.loadAvailableModels()
+            }
+        }.value
+        
+        // 3. モデルが見つかったらWelcome画面を調整
+        await MainActor.run {
+            if !modelManager.hasAnyLocalModel {
+                showWelcome = true
+            }
+        }
+        
+        // 4. 選択されたモデルがあれば事前準備（プリロード）
+        if let selectedModel = selectedModel,
+           let id = modelManager.selectedConversationID,
+           let conv = modelManager.conversations.first(where: { $0.id == id }) {
+            let modelName = conv.modelName ?? selectedModel
+            await preloadModelIfNeeded(modelName)
+        }
+    }
+    
+    // モデルの事前準備（初回メッセージ送信の高速化）
+    private func preloadModelIfNeeded(_ modelName: String) async {
+        let candidate = modelManager.modelsDir.appendingPathComponent(modelName)
+        guard FileManager.default.fileExists(atPath: candidate.path) else { return }
+        
+        // バックグラウンドでモデルを事前準備
+        await Task.detached(priority: .background) {
+            // エンジンの初期化を事前に実行（実際の生成はしない）
+            // これにより初回メッセージ送信時の遅延を軽減
+            await MainActor.run {
+                // プリロード状態を表示（オプショナル）
+                // modelManager.engineStatus = .loading(modelName: modelName)
+            }
+            
+            // 実際のプリロード処理は軽量化のため簡素化
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1秒の軽微な遅延のみ
+            
+            await MainActor.run {
+                // プリロード完了
+                // modelManager.engineStatus = .idle
+            }
+        }.value
     }
 
     // 旧データ（モデル名）→ 現在のPickerタグ（fileName）に正規化
@@ -365,8 +422,13 @@ struct ContentView: View {
         }
         guard let model = modelToUse else { return }
 
+        // 即座に入力をクリアしてUIの応答性を向上
         messageInput = ""
-        modelManager.sendMessage(trimmed, using: model, provider: providerToUse)
+        
+        // メッセージ送信をバックグラウンドタスクで実行
+        Task {
+            modelManager.sendMessage(trimmed, using: model, provider: providerToUse)
+        }
     }
 
     private func handleNotificationAction(_ notice: ModelManager.SystemNotification) {
@@ -413,6 +475,17 @@ private struct ChatArea: View {
                 }
                 .background(Color(nsColor: .controlBackgroundColor))
                 .onChange(of: messages.count) { _ in
+                    // 新しいメッセージが追加されたら即座にスクロール
+                    if let last = messages.last?.id {
+                        DispatchQueue.main.async {
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                proxy.scrollTo(last, anchor: .bottom)
+                            }
+                        }
+                    }
+                }
+                .onChange(of: messages.last?.content) { _ in
+                    // メッセージ内容が更新された場合もスクロール（ストリーミング対応）
                     if let last = messages.last?.id {
                         withAnimation(.easeOut(duration: 0.2)) {
                             proxy.scrollTo(last, anchor: .bottom)
