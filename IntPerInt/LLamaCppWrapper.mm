@@ -147,6 +147,12 @@ static NSString *EnsureManagedRuntimeAndInstall(NSString *execSrcPath) {
                seed:(NSNumber * _Nullable)seed
                stop:(NSArray<NSString *> * _Nullable)stop
           completion:(void (^)(NSString * _Nullable response, NSError * _Nullable error))completion {
+    // 即座にメインスレッドに制御を返し、UI フリーズを防ぐ
+    dispatch_async(dispatch_get_main_queue(), ^{
+        // UI を即座に「生成中」状態に更新（ここで呼び出し元に制御が戻る）
+        NSLog(@"[IntPerInt] Starting generation (UI will update immediately)");
+    });
+    
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         @autoreleasepool {
             // Resolve llama-cli from preferred bundled runtime, then managed, then system locations
