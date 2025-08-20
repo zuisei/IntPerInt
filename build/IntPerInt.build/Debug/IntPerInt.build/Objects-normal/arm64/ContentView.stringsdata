@@ -111,7 +111,7 @@
         "key": "⌘⏎ で送信 • Shift+Enterで改行",
         "location": {
           "startingColumn": 22,
-          "startingLine": 503
+          "startingLine": 576
         }
       },
       {
@@ -119,7 +119,7 @@
         "key": "Ask anything",
         "location": {
           "startingColumn": 38,
-          "startingLine": 443
+          "startingLine": 516
         }
       },
       {
@@ -127,7 +127,7 @@
         "key": "Download",
         "location": {
           "startingColumn": 24,
-          "startingLine": 537
+          "startingLine": 610
         }
       },
       {
@@ -135,7 +135,7 @@
         "key": "%lld%%",
         "location": {
           "startingColumn": 26,
-          "startingLine": 530
+          "startingLine": 603
         }
       },
       {
@@ -143,7 +143,7 @@
         "key": "You",
         "location": {
           "startingColumn": 39,
-          "startingLine": 568
+          "startingLine": 641
         }
       },
       {
@@ -151,7 +151,7 @@
         "key": "Assistant",
         "location": {
           "startingColumn": 47,
-          "startingLine": 568
+          "startingLine": 641
         }
       },
       {
@@ -159,7 +159,7 @@
         "key": "設定",
         "location": {
           "startingColumn": 18,
-          "startingLine": 635
+          "startingLine": 708
         }
       },
       {
@@ -167,7 +167,7 @@
         "key": "通常は自動セットアップされます。問題がある場合のみ手動指定してください。例: /opt/homebrew/opt/llama.cpp/bin/llama-cli",
         "location": {
           "startingColumn": 18,
-          "startingLine": 636
+          "startingLine": 709
         }
       },
       {
@@ -175,7 +175,7 @@
         "key": "/path/to/llama または llama-cli",
         "location": {
           "startingColumn": 27,
-          "startingLine": 639
+          "startingLine": 712
         }
       },
       {
@@ -183,7 +183,7 @@
         "key": "保存",
         "location": {
           "startingColumn": 24,
-          "startingLine": 641
+          "startingLine": 714
         }
       },
       {
@@ -191,7 +191,7 @@
         "key": "参照…",
         "location": {
           "startingColumn": 24,
-          "startingLine": 646
+          "startingLine": 719
         }
       },
       {
@@ -199,7 +199,7 @@
         "key": "アプリに取り込む",
         "location": {
           "startingColumn": 24,
-          "startingLine": 647
+          "startingLine": 720
         }
       },
       {
@@ -207,7 +207,7 @@
         "key": "検出/テスト",
         "location": {
           "startingColumn": 24,
-          "startingLine": 651
+          "startingLine": 724
         }
       },
       {
@@ -215,7 +215,7 @@
         "key": "自動検出",
         "location": {
           "startingColumn": 24,
-          "startingLine": 680
+          "startingLine": 753
         }
       },
       {
@@ -223,7 +223,7 @@
         "key": "よくあるパスから自動検出します",
         "location": {
           "startingColumn": 27,
-          "startingLine": 681
+          "startingLine": 754
         }
       },
       {
@@ -231,7 +231,7 @@
         "key": "自動セットアップ",
         "location": {
           "startingColumn": 24,
-          "startingLine": 682
+          "startingLine": 755
         }
       },
       {
@@ -239,7 +239,7 @@
         "key": "検出できたCLIをアプリ内に取り込み、設定を自動保存します",
         "location": {
           "startingColumn": 27,
-          "startingLine": 683
+          "startingLine": 756
         }
       }
     ]
