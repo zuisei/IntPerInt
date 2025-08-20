@@ -68,6 +68,12 @@ struct ModelInfo: Identifiable, Hashable {
     ModelInfo(name: "Nous-Hermes-2 Mixtral 8x7B DPO", huggingFaceRepo: "TheBloke/Nous-Hermes-2-Mixtral-8x7B-DPO-GGUF", fileName: "nous-hermes-2-mixtral-8x7b-dpo.Q4_K_M.gguf"),
     ModelInfo(name: "Llama-2-13B-Chat", huggingFaceRepo: "TheBloke/Llama-2-13B-Chat-GGUF", fileName: "llama-2-13b-chat.Q4_K_M.gguf"),
     ModelInfo(name: "SOLAR-10.7B-Instruct v1.0", huggingFaceRepo: "TheBloke/solar-10.7b-instruct-v1.0-GGUF", fileName: "solar-10.7b-instruct-v1.0.Q4_K_M.gguf"),
+    
+    // GPT-OSS シリーズ（Unsloth提供）
+    ModelInfo(name: "GPT-OSS-20B (Q4_K_M)", huggingFaceRepo: "unsloth/gpt-oss-20b-GGUF", fileName: "gpt-oss-20b-Q4_K_M.gguf"),
+    ModelInfo(name: "GPT-OSS-20B (Q5_K_M)", huggingFaceRepo: "unsloth/gpt-oss-20b-GGUF", fileName: "gpt-oss-20b-Q5_K_M.gguf"),
+    ModelInfo(name: "GPT-OSS-120B (Q4_K_M)", huggingFaceRepo: "unsloth/gpt-oss-120b-GGUF", fileName: "Q4_K_M/gpt-oss-120b-Q4_K_M-00001-of-00002.gguf"),
+    ModelInfo(name: "GPT-OSS-120B (Q5_K_M)", huggingFaceRepo: "unsloth/gpt-oss-120b-GGUF", fileName: "Q5_K_M/gpt-oss-120b-Q5_K_M-00001-of-00002.gguf"),
 
     // 軽量（高速・省メモリ）
     ModelInfo(name: "TinyLlama-1.1B-Chat v1.0", huggingFaceRepo: "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF", fileName: "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"),
