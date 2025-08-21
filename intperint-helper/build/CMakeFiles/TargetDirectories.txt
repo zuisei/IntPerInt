@@ -1,0 +1,3 @@
+/Users/0xt4/Projects/IntPerInt/intperint-helper/build/CMakeFiles/intperint_helper.dir
+/Users/0xt4/Projects/IntPerInt/intperint-helper/build/CMakeFiles/edit_cache.dir
+/Users/0xt4/Projects/IntPerInt/intperint-helper/build/CMakeFiles/rebuild_cache.dir

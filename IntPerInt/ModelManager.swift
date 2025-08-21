@@ -57,6 +57,9 @@ class ModelManager: ObservableObject {
     private var saveDebounceWorkItem: Task<Void, Never>? = nil
     // 通知の重複抑止
     private var lastNotificationTimestamps: [String: Date] = [:]
+    
+    // ファイルシステム監視用
+    private var fileSystemMonitor: DispatchSourceFileSystemObject? = nil
 
     init() {
         // Create models directory in user's Application Support folder
@@ -72,6 +75,14 @@ class ModelManager: ObservableObject {
         // default selection
         selectedConversationID = conversations.first?.id
         messages = conversations.first?.messages ?? []
+        
+        // ファイルシステム監視を開始（モデル追加時の自動再読み込み用）
+        startFileSystemMonitoring()
+    }
+    
+    // デイニシャライザーでリソース解放
+    deinit {
+        fileSystemMonitor?.cancel()
     }
 
     // 旧CLI検出系は撤去
@@ -309,14 +320,25 @@ class ModelManager: ObservableObject {
 
         // resolve model file path
         let candidate = modelsDirectory.appendingPathComponent(modelName)
-        if FileManager.default.fileExists(atPath: candidate.path) {
+        
+        // ファイル存在チェックを非同期で実行（UIスレッドをブロックしない）
+        let fileExists = await Task.detached {
+            FileManager.default.fileExists(atPath: candidate.path)
+        }.value
+        
+        if fileExists {
             if currentModelPath?.path != candidate.path {
                 await MainActor.run { self.engineStatus = .loading(modelName: modelName) }
-                // libエンジンのみ使用
+                // libエンジンのロードを非同期バックグラウンドで実行（メインスレッドをブロックしない）
                 do {
-                    var lib = LlamaCppLibEngine()
-                    try lib.load(modelPath: candidate)
-                    self.engine = lib
+                    let loadedEngine = try await Task.detached(priority: .userInitiated) {
+                        var lib = LlamaCppLibEngine()
+                        try lib.load(modelPath: candidate)
+                        return lib
+                    }.value
+                    
+                    // メインアクターで状態更新
+                    self.engine = loadedEngine
                     self.currentModelPath = candidate
                     logger.info("LIB ENGINE LOADED model path: \(candidate.path, privacy: .public)")
                     await MainActor.run {
@@ -369,6 +391,52 @@ class ModelManager: ObservableObject {
 }
 
 // InstalledModel moved to Models/InstalledModel.swift
+
+// MARK: - File System Monitoring
+extension ModelManager {
+    private func startFileSystemMonitoring() {
+        // modelsDirectoryを監視してファイル追加・削除を検出
+        let descriptor = open(self.modelsDirectory.path, O_EVTONLY)
+        guard descriptor != -1 else {
+            logger.error("Failed to open models directory for monitoring: \(self.modelsDirectory.path, privacy: .public)")
+            return
+        }
+        
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: descriptor,
+            eventMask: [.write, .extend, .delete],
+            queue: DispatchQueue.global(qos: .utility)
+        )
+        
+        source.setEventHandler { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                // ファイルシステムの変更を検出したらモデルリストを更新
+                self.logger.info("Models directory changed, refreshing model list")
+                self.refreshInstalledModels()
+                
+                // 通知を表示
+                self.postSystemNotification(
+                    key: "model_list_updated",
+                    message: "モデルリストが更新されました",
+                    severity: .info,
+                    actions: [],
+                    throttleSeconds: 5,
+                    autoHideAfter: 3
+                )
+            }
+        }
+        
+        source.setCancelHandler {
+            close(descriptor)
+        }
+        
+        source.resume()
+        self.fileSystemMonitor = source
+        
+        logger.info("File system monitoring started for: \(self.modelsDirectory.path, privacy: .public)")
+    }
+}
 
 // MARK: - Helpers
 extension ModelManager {

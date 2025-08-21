@@ -1,0 +1,42 @@
+{
+  "workdir_base": "{HOME}/Library/Application Support/IntPerInt/outputs",
+  "models": {
+    "sdxl": {
+      "type": "diffusers",
+      "diffusers": {
+        "model_dir": "{HOME}/Library/Application Support/IntPerInt/models/sdxl/stabilityai-sdxl-base-1.0",
+        "vae_path": "{HOME}/Library/Application Support/IntPerInt/models/sdxl/vae.safetensors",
+        "refiner_path": "{HOME}/Library/Application Support/IntPerInt/models/sdxl/refiner.safetensors"
+      },
+      "sd_cpp": {
+        "model_gguf": "{HOME}/Library/Application Support/IntPerInt/models/sdxl/sdxl-gguf.sd",
+        "bin": "{HOME}/sd_cpp/main"
+      }
+    },
+    "animatediff": {
+      "motion_lora_dir": "{HOME}/Library/Application Support/IntPerInt/models/animatediff/motions",
+      "script": "{HOME}/intperint-helper/scripts/animate_diff_run.py"
+    },
+    "llm_20b": {
+      "type": "gguf",
+      "path": "{HOME}/Library/Application Support/IntPerInt/models/llm/20b-q4.gguf",
+      "quant": "q4_0",
+      "threads": 10,
+      "bin": "/usr/local/bin/llama_cpp_bin"
+    },
+    "embedding": {
+      "name": "all-MiniLM-L6-v2",
+      "path": "{HOME}/Library/Application Support/IntPerInt/models/embeddings/all-MiniLM-L6-v2"
+    }
+  },
+  "cmd_templates": {
+    "sd_diffusers": "python3 {HOME}/intperint-helper/scripts/run_sd_diffusers.py --model_dir \"{MODEL_DIR}\" --prompt \"{PROMPT}\" --out \"{OUT_PNG}\" --steps {STEPS} --device mps",
+    "sd_cpp_cli": "{SD_CPP_BIN} -m \"{MODEL_GGUF}\" -p \"{PROMPT}\" -o \"{OUT_PNG}\" -s {STEPS} -W {W} -H {H}",
+    "animatediff": "python3 {HOME}/intperint-helper/scripts/animate_diff_run.py --init \"{INIT_IMAGE}\" --prompt \"{PROMPT}\" --motion \"{MOTION_MODULE}\" --frames {FRAMES} --out \"{OUT_MP4}\"",
+    "llama_run": "{LLAMA_BIN} -m \"{MODEL_PATH}\" -p \"{PROMPT}\" -n {TOKENS} -t {THREADS} --stream --out \"{OUT_TXT}\""
+  },
+  "concurrency": {
+    "max_gpu_jobs": 1,
+    "max_cpu_jobs": 2
+  }
+}

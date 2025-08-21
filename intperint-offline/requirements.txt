@@ -1,0 +1,17 @@
+fastapi==0.115.0
+uvicorn==0.30.6
+pydantic==2.9.2
+numpy==2.1.1
+# Optional at runtime depending on services
+# For llama-cpp-python (CPU/MPS): you will provide wheel offline
+llama-cpp-python
+# For diffusers + torch (installed from wheels offline)
+torch
+torchvision
+accelerate
+safetensors
+transformers
+diffusers
+# For tests
+pytest
+requests

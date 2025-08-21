@@ -1,0 +1,42 @@
+{
+  "workdir_base": "/Users/0xt4/Library/Application Support/IntPerInt/outputs",
+  "models": {
+    "sdxl": {
+      "type": "diffusers", 
+      "diffusers": {
+        "model_dir": "/Users/0xt4/Library/Application Support/IntPerInt/models/sdxl/stabilityai-sdxl-base-1.0",
+        "vae_path": "/Users/0xt4/Library/Application Support/IntPerInt/models/sdxl/vae.safetensors",
+        "refiner_path": "/Users/0xt4/Library/Application Support/IntPerInt/models/sdxl/refiner.safetensors"
+      },
+      "sd_cpp": {
+        "model_gguf": "/Users/0xt4/Library/Application Support/IntPerInt/models/sdxl/sdxl-gguf.sd",
+        "bin": "/Users/0xt4/sd_cpp/main"
+      }
+    },
+    "animatediff": {
+      "motion_lora_dir": "/Users/0xt4/Library/Application Support/IntPerInt/models/animatediff/motions",
+      "script": "/Users/0xt4/intperint-helper/scripts/animate_diff_run.py"
+    },
+    "llm_20b": {
+      "type": "gguf",
+      "path": "/Users/0xt4/Library/Application Support/IntPerInt/models/llm/20b-q4.gguf",
+      "quant": "q4_0",
+      "threads": 10,
+      "bin": "/usr/local/bin/llama_cpp_bin"
+    },
+    "embedding": {
+      "name": "all-MiniLM-L6-v2",
+      "path": "/Users/0xt4/Library/Application Support/IntPerInt/models/embeddings/all-MiniLM-L6-v2"
+    }
+  },
+  "cmd_templates": {
+    "sd_diffusers": "python3 /Users/0xt4/intperint-helper/scripts/run_sd_diffusers.py --model_dir \"{MODEL_DIR}\" --prompt \"{PROMPT}\" --out \"{OUT_PNG}\" --steps {STEPS} --device mps",
+    "sd_cpp_cli": "/Users/0xt4/sd_cpp/main -m \"{MODEL_GGUF}\" -p \"{PROMPT}\" -o \"{OUT_PNG}\" -s {STEPS} -W {W} -H {H}",
+    "animatediff": "python3 /Users/0xt4/intperint-helper/scripts/animate_diff_run.py --init \"{INIT_IMAGE}\" --prompt \"{PROMPT}\" --motion \"{MOTION_MODULE}\" --frames {FRAMES} --out \"{OUT_MP4}\"",
+    "llama_run": "/usr/local/bin/llama_cpp_bin -m \"{MODEL_PATH}\" -p \"{PROMPT}\" -n {TOKENS} -t {THREADS} --stream --out \"{OUT_TXT}\""
+  },
+  "concurrency": {
+    "max_gpu_jobs": 1,
+    "max_cpu_jobs": 2
+  }
+}
