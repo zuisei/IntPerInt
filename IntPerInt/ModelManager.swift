@@ -3,6 +3,14 @@ import Combine
 import os
 import AppKit
 
+// インストール済みモデルの情報
+struct InstalledModel: Identifiable, Hashable {
+    let id = UUID()
+    let name: String      // 表示名
+    let fileName: String  // 実ファイル名
+    let url: URL
+}
+
 @MainActor
 class ModelManager: ObservableObject {
     // 会話管理
@@ -386,11 +394,44 @@ extension ModelManager {
     func refreshInstalledModels() {
         guard let contents = try? FileManager.default.contentsOfDirectory(at: modelsDirectory, includingPropertiesForKeys: [.fileSizeKey], options: .skipsHiddenFiles) else { return }
         let ggufs = contents.filter { $0.pathExtension.lowercased() == "gguf" }
-        let built: [InstalledModel] = ggufs.map { url in
+        
+        // 分割ファイルパターン: -00001-of-00002.gguf形式を検出
+        let splitFilePattern = #"-\d{5}-of-\d{5}\.gguf$"#
+        let regex = try? NSRegularExpression(pattern: splitFilePattern, options: [])
+        
+        var modelGroups: [String: [URL]] = [:]
+        var singleFiles: [URL] = []
+        
+        for url in ggufs {
+            let fileName = url.lastPathComponent
+            if let match = regex?.firstMatch(in: fileName, options: [], range: NSRange(location: 0, length: fileName.count)) {
+                // 分割ファイル: ベース名でグループ化
+                let baseName = String(fileName.prefix(match.range.location))
+                modelGroups[baseName, default: []].append(url)
+            } else {
+                // 単一ファイル
+                singleFiles.append(url)
+            }
+        }
+        
+        var built: [InstalledModel] = []
+        
+        // 単一ファイルを追加
+        for url in singleFiles {
             let file = url.lastPathComponent
-            return InstalledModel(name: prettyName(for: file), fileName: file, url: url)
-        }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        installedModels = built
+            built.append(InstalledModel(name: prettyName(for: file), fileName: file, url: url))
+        }
+        
+        // 分割ファイルグループを追加（最初のファイルをメインにする）
+        for (baseName, urls) in modelGroups {
+            let sortedUrls = urls.sorted { $0.lastPathComponent < $1.lastPathComponent }
+            if let firstUrl = sortedUrls.first {
+                let displayName = prettyName(for: baseName + ".gguf")
+                built.append(InstalledModel(name: displayName, fileName: firstUrl.lastPathComponent, url: firstUrl))
+            }
+        }
+        
+        installedModels = built.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
         // compute total size
         var total: Int64 = 0

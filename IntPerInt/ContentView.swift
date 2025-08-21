@@ -9,8 +9,6 @@ struct ContentView: View {
     @State private var selectedModel: String? = nil
     @AppStorage("hasSeenWelcome") private var hasSeenWelcome: Bool = false
     @State private var showWelcome: Bool = false
-    @State private var showModelDownload: Bool = false
-    @State private var isDownloadMinimized: Bool = false
     @State private var showSettings: Bool = false
     @State private var showDiagnostics: Bool = false
 
@@ -140,30 +138,18 @@ struct ContentView: View {
                         }
                     }
 
-                    // Welcome 以外からもダウンロード画面を開けるボタン
+                    // モデルフォルダを開くボタン
                     Button {
-                        // 相互排他：他のオーバーレイを閉じてから開く（次ランループで反映）
-                        let open = {
-                            self.showModelDownload = true
-                            self.isDownloadMinimized = false
-                        }
-                        self.showSettings = false
-                        self.showDiagnostics = false
-                        DispatchQueue.main.async { open() }
+                        NSWorkspace.shared.activateFileViewerSelecting([modelManager.modelsDir])
                     } label: {
-                        Label("モデルをダウンロード", systemImage: "arrow.down.circle")
+                        Label("モデルフォルダを開く", systemImage: "folder")
                     }
                     .buttonStyle(.bordered)
-                    .help("推奨 GGUF モデルをカタログから取得")
+                    .help("GGUFモデルファイルを手動で配置するフォルダを開きます")
 
                     // 設定（LLAMACPP_CLI）
                     Button {
-                        // 相互排他（次ランループで反映）
-                        self.showDiagnostics = false
-                        DispatchQueue.main.async {
-                            self.showModelDownload = false
-                            self.showSettings.toggle()
-                        }
+                        showSettings.toggle()
                     } label: {
                         Label("設定", systemImage: "gearshape")
                     }
@@ -176,12 +162,7 @@ struct ContentView: View {
                     }
 
                     Button {
-                        // 相互排他（次ランループで反映）
-                        self.showSettings = false
-                        DispatchQueue.main.async {
-                            self.showModelDownload = false
-                            self.showDiagnostics.toggle()
-                        }
+                        showDiagnostics.toggle()
                     } label: {
                         Label("診断", systemImage: "stethoscope")
                     }
@@ -224,49 +205,6 @@ struct ContentView: View {
             }
             .frame(minWidth: 960, minHeight: 600)
         }
-    // Overlay for ModelDownload: floating island (top-right), 非ブロッキング + 最小化対応
-    .overlay(alignment: .topTrailing) {
-        if showModelDownload {
-            VStack {
-                HStack {
-                    if isDownloadMinimized {
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.down.circle")
-                            Text("ダウンロード")
-                            if !modelManager.downloadingModels.isEmpty {
-                                Text("\(modelManager.downloadingModels.count)件進行中")
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                            Button { isDownloadMinimized = false } label: { Image(systemName: "arrow.up.left.and.arrow.down.right") }
-                                .buttonStyle(.plain)
-                        }
-                        .padding(.horizontal, 12).padding(.vertical, 8)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .overlay(Capsule().stroke(Color.white.opacity(0.08)))
-                        .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
-                    } else {
-                        ModelDownloadView(modelManager: modelManager) { fileName in
-                            modelManager.setCurrentModelForSelectedConversation(name: fileName)
-                            showModelDownload = false
-                        } onClose: { showModelDownload = false } minimize: { isDownloadMinimized = true }
-                        .frame(width: 560, height: 560)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.08))
-                        )
-                        .shadow(color: .black.opacity(0.35), radius: 24, y: 8)
-                    }
-                }
-                .padding(.top, 72)
-                .padding(.trailing, 24)
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            .zIndex(1000)
-            .transition(.move(edge: .top).combined(with: .opacity))
-            .transaction { $0.disablesAnimations = true }
-        }
-    }
     // Hidden global Command-Q handler (active in all states, including overlays)
     .overlay(alignment: .topLeading) {
         Button("") { NSApplication.shared.terminate(nil) }

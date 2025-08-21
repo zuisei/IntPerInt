@@ -1,5 +1,3 @@
-/Users/0xt4/Projects/IntPerInt/IntPerInt/Engines/LlamaCppEngine.swift
-/Users/0xt4/Projects/IntPerInt/IntPerInt/IntPerIntApp.swift
 /Users/0xt4/Projects/IntPerInt/IntPerInt/Utils/ModelValidator.swift
 /Users/0xt4/Projects/IntPerInt/IntPerInt/Shared/RuntimeEnv.swift
 /Users/0xt4/Projects/IntPerInt/IntPerInt/Storage/ConversationStore.swift
@@ -14,4 +12,6 @@
 /Users/0xt4/Projects/IntPerInt/IntPerInt/Models.swift
 /Users/0xt4/Projects/IntPerInt/IntPerInt/Engines/LlamaCppLibEngine.swift
 /Users/0xt4/Projects/IntPerInt/IntPerInt/Views/WelcomeAndModelDownload.swift
+/Users/0xt4/Projects/IntPerInt/IntPerInt/Engines/LlamaCppEngine.swift
+/Users/0xt4/Projects/IntPerInt/IntPerInt/IntPerIntApp.swift
 /Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/DerivedSources/GeneratedAssetSymbols.swift
