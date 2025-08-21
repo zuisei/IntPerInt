@@ -10,10 +10,9 @@ SwiftUI製のmacOSアプリケーションで、ローカルLLM推論とクラ�
 - **OpenAI GPT** - クラウドベースのGPT API統合
 
 ### 🔄 モデル管理
-- GGUF形式モデルの自動ダウンロード
-- HuggingFace リポジトリからの直接インポート
-- 推奨モデル（Llama 2, CodeLlama, Mistral）
-- カスタムモデルURL対応
+- GGUF形式モデルの手動配置（フォルダドラッグ&ドロップ対応）
+- モデルフォルダへの直接アクセス機能
+- カスタムモデルファイルの取り込み
 
 ### ⚙️ 設定
 - Temperature, Max Tokens, Top-p調整

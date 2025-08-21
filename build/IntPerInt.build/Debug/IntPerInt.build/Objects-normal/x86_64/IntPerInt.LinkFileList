@@ -1,6 +1,4 @@
 /Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LLamaCppWrapper.o
-/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppEngine.o
-/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/IntPerIntApp.o
 /Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ModelValidator.o
 /Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/RuntimeEnv.o
 /Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/ConversationStore.o
@@ -15,4 +13,6 @@
 /Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/Models.o
 /Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppLibEngine.o
 /Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/WelcomeAndModelDownload.o
+/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/LlamaCppEngine.o
+/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/IntPerIntApp.o
 /Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/Objects-normal/x86_64/GeneratedAssetSymbols.o

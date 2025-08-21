@@ -5,7 +5,6 @@ import Foundation
 struct WelcomeView: View {
     @ObservedObject var modelManager: ModelManager
     @Binding var hasSeenWelcome: Bool
-    @State private var showDownloadSheet = false
     let onComplete: () -> Void
 
     var body: some View {
@@ -50,24 +49,15 @@ struct WelcomeView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("モデルを入手")
                             .font(.title2.bold())
-                        Text("推奨 GGUF モデルをカタログからダウンロードするか、フォルダを開いて手動で配置できます。")
+                        Text("GGUFファイルを手動でモデルフォルダに配置してください。フォルダを開いて直接ファイルをコピーできます。")
                             .foregroundStyle(.secondary)
                         Spacer()
-                        HStack {
-                            Button {
-                                showDownloadSheet = true
-                            } label: {
-                                Label("モデルをダウンロード", systemImage: "arrow.down.circle.fill")
-                            }
-                            .buttonStyle(.borderedProminent)
-
-                            Button {
-                                NSWorkspace.shared.activateFileViewerSelecting([modelManager.modelsDir])
-                            } label: {
-                                Label("フォルダを開く", systemImage: "folder")
-                            }
-                            .buttonStyle(.bordered)
+                        Button {
+                            NSWorkspace.shared.activateFileViewerSelecting([modelManager.modelsDir])
+                        } label: {
+                            Label("モデルフォルダを開く", systemImage: "folder")
                         }
+                        .buttonStyle(.borderedProminent)
                     }
                     .padding(20)
                     .frame(width: 420, height: 220)
@@ -79,40 +69,13 @@ struct WelcomeView: View {
                 Spacer()
             }
             .padding(.bottom, 40)
-            // Modal overlay (island style): background tap to dismiss, no dimming
-            if showDownloadSheet {
-                ZStack(alignment: .topTrailing) {
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture { showDownloadSheet = false }
-                        .ignoresSafeArea()
-
-                    ModelDownloadView(modelManager: modelManager) { fileName in
-                        modelManager.setCurrentModelForSelectedConversation(name: fileName)
-                        hasSeenWelcome = true
-                        showDownloadSheet = false
-                        onComplete()
-                    } onClose: { showDownloadSheet = false }
-                    .frame(width: 560, height: 560)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18)
-                            .stroke(Color.white.opacity(0.08))
-                    )
-                    .shadow(color: .black.opacity(0.35), radius: 24, y: 8)
-                    .padding(.top, 72)
-                    .padding(.trailing, 24)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .zIndex(1000)
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: showDownloadSheet)
-            }
         }
         .onAppear { modelManager.loadAvailableModels() }
     }
 }
 
+// MARK: - Model Download View (Disabled - Manual GGUF placement only)
+/*
 struct ModelDownloadView: View {
     @ObservedObject var modelManager: ModelManager
     var onUseModel: (String) -> Void
@@ -390,3 +353,4 @@ private struct CapsuleAction: View {
         .foregroundStyle(.primary)
     }
 }
+*/
