@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+.pytest_cache/
+.venv/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Logs & outputs
+logs/
+outputs/
+
+# Local assets
+models/
+wheels/
+uploads/
+checksums/
+
+# Env
+.env

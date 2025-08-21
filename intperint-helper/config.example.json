@@ -1,0 +1,18 @@
+{
+  "paths": {
+    "work_base": "~/Library/Application Support/IntPerInt/outputs"
+  },
+  "models": {
+    "sd_model_path": "/ABS/PATH/TO/SDXL/model.safetensors",
+    "llama_model_path": "/ABS/PATH/TO/LLAMA/model.gguf",
+    "animatediff_env": "/ABS/PATH/TO/venv/bin/python"
+  },
+  "command_templates": {
+    "SD_CMD_TEMPLATE": "/usr/bin/env bash -lc 'echo Generating SDXL to {OUT_PNG}; sleep 1; > {OUT_PNG}'",
+    "VIDEO_CMD_TEMPLATE": "/usr/bin/env bash -lc 'echo Generating video to {OUT_MP4}; sleep 1; > {OUT_MP4}'",
+    "LLM_CMD_TEMPLATE": "/usr/bin/env bash -lc 'echo LLM out to {OUT_TXT}; echo Hello > {OUT_TXT}'"
+  },
+  "concurrency": {
+    "max_gpu_jobs": 1
+  }
+}
