@@ -4,12 +4,35 @@
 #import <unistd.h>
 #import <sys/types.h>
 #import <sys/wait.h>
+#import <Metal/Metal.h>
 // #import "llama.h" // Uncomment when llama.cpp is properly linked
 
 @implementation LLamaCppWrapper {
     // void *_model; // llama_model * when properly linked
     // void *_context; // llama_context * when properly linked
     NSString *_modelPath; // persisted for CLI invocation until lib API is wired
+}
+// Split marker to reliably separate prompt from model output
+static NSString * const kResponseSentinel = @"<|OUTPUT|>";
+
+// Helper: detect if a given llama CLI supports a specific flag by checking --help output
+static BOOL LlamaCliSupportsFlag(NSString *cliPath, NSString *flag) {
+    if (cliPath.length == 0 || flag.length == 0) return NO;
+    @try {
+        NSTask *t = [[NSTask alloc] init];
+        t.launchPath = cliPath;
+        t.arguments = @[ @"--help" ];
+        NSPipe *p = [NSPipe pipe];
+        t.standardOutput = p; t.standardError = p;
+        dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+        t.terminationHandler = ^(NSTask *tt){ dispatch_semaphore_signal(sem); };
+        [t launch];
+        // wait up to ~800ms; help is fast and avoids blocking
+        (void)dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)));
+        NSData *d = [[p fileHandleForReading] readDataToEndOfFile];
+        NSString *s = [[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding] ?: @"";
+        return [s containsString:flag];
+    } @catch(NSException *e) { return NO; }
 }
 
 static NSString *EnsureManagedRuntimeAndInstall(NSString *execSrcPath) {
@@ -135,7 +158,7 @@ static NSString *EnsureManagedRuntimeAndInstall(NSString *execSrcPath) {
                 completion(NO, error);
                 return;
             }
-            _modelPath = [modelPath copy];
+            self->_modelPath = [modelPath copy];
             completion(YES, nil);
         });
     });
@@ -260,7 +283,7 @@ static NSString *EnsureManagedRuntimeAndInstall(NSString *execSrcPath) {
             // Build arguments
             NSMutableArray<NSString *> *args = [NSMutableArray array];
             // Ensure model path provided by loadModel
-            NSString *modelPath = _modelPath;
+            NSString *modelPath = self->_modelPath;
             if (modelPath.length == 0) {
                 dispatch_async(dispatch_get_main_queue(), ^{
                     NSError *err = [NSError errorWithDomain:@"LLamaCpp" code:400 userInfo:@{NSLocalizedDescriptionKey: @"Model not loaded"}];
@@ -269,16 +292,39 @@ static NSString *EnsureManagedRuntimeAndInstall(NSString *execSrcPath) {
                 return;
             }
 
-            // Pass model, prompt and generation params
+            // Append a sentinel so we can surgically strip any echoed prompt
+            NSString *basicPrompt = [NSString stringWithFormat:@"%@\n\n%@\n", (prompt ?: @"こんにちは"), kResponseSentinel];
+            
+            // 最小限のオプションのみ
             [args addObjectsFromArray:@[ @"-m", modelPath ]];
-            [args addObjectsFromArray:@[ @"-p", prompt ?: @"", @"-n", [NSString stringWithFormat:@"%ld", (long)MAX(1, (long)maxTokens)] ]];
-            [args addObjectsFromArray:@[ @"--temp", [NSString stringWithFormat:@"%g", temperature] ]];
+            [args addObjectsFromArray:@[ @"-p", basicPrompt ]];
+            NSInteger tok = (maxTokens > 0 ? maxTokens : 50);
+            [args addObjectsFromArray:@[ @"-n", [@(tok) stringValue] ]];  // 応答トークン数
+            
             if (seed) { [args addObjectsFromArray:@[ @"--seed", seed.stringValue ]]; }
-            for (NSString *s in (stop ?: @[])) { if (s.length) [args addObjectsFromArray:@[@"--stop", s]]; }
+
+            // Respect user-provided stop sequences (each becomes --stop <seq>)
+            if (stop.count > 0) {
+                for (NSString *s in stop) {
+                    if (s.length > 0) {
+                        [args addObjectsFromArray:@[@"--stop", s]];
+                    }
+                }
+            }
+
+            // Keep llama.cpp quiet and do not echo the prompt, but only add flags if supported
+            NSMutableArray<NSString *> *quiet = [NSMutableArray array];
+            if (LlamaCliSupportsFlag(cli, @"--log-disable"))        [quiet addObject:@"--log-disable"];
+            if (LlamaCliSupportsFlag(cli, @"--no-display-prompt"))  [quiet addObject:@"--no-display-prompt"];
+            if (LlamaCliSupportsFlag(cli, @"--simple-io"))          [quiet addObject:@"--simple-io"];
+            if (quiet.count) [args addObjectsFromArray:quiet];
 
             // Launch task
-            NSLog(@"[IntPerInt] Launching llama exec: %@", cli);
-            NSLog(@"[IntPerInt] Command arguments: %@", [args componentsJoinedByString:@" "]);
+            NSLog(@"[IntPerInt] DEBUG: Launching llama exec: %@", cli);
+            NSLog(@"[IntPerInt] DEBUG: Command arguments: %@", [args componentsJoinedByString:@" "]);
+            NSLog(@"[IntPerInt] DEBUG: Working directory: %@", [cli stringByDeletingLastPathComponent]);
+            NSLog(@"[IntPerInt] DEBUG: Model path exists: %@", [[NSFileManager defaultManager] fileExistsAtPath:modelPath] ? @"YES" : @"NO");
+            
             NSTask *task = [[NSTask alloc] init];
             task.launchPath = cli;
             task.currentDirectoryPath = [cli stringByDeletingLastPathComponent];
@@ -287,6 +333,53 @@ static NSString *EnsureManagedRuntimeAndInstall(NSString *execSrcPath) {
             NSPipe *stderrPipe = [NSPipe pipe];
             task.standardOutput = stdoutPipe;
             task.standardError = stderrPipe;
+
+            // --- BEGIN: async drain stdout/stderr to avoid pipe deadlock ---
+            __block NSMutableData *outBuf = [NSMutableData data];
+            __block NSMutableData *errBuf = [NSMutableData data];
+            __block BOOL stdoutClosed = NO;
+            __block BOOL stderrClosed = NO;
+
+            NSFileHandle *outFH = [stdoutPipe fileHandleForReading];
+            NSFileHandle *errFH = [stderrPipe fileHandleForReading];
+
+            outFH.readabilityHandler = ^(NSFileHandle *h) {
+                @autoreleasepool {
+                    NSData *d = [h availableData];
+                    if (d.length > 0) {
+                        [outBuf appendData:d];
+                    } else {
+                        // EOF
+                        stdoutClosed = YES;
+                        h.readabilityHandler = nil;
+                    }
+                }
+            };
+
+            errFH.readabilityHandler = ^(NSFileHandle *h) {
+                @autoreleasepool {
+                    NSData *d = [h availableData];
+                    if (d.length > 0) {
+                        [errBuf appendData:d];
+                    } else {
+                        // EOF
+                        stderrClosed = YES;
+                        h.readabilityHandler = nil;
+                    }
+                }
+            };
+
+            // termination group instead of waitUntilExit + semaphore
+            __block BOOL launchFailed = NO;
+            __block int  termStatus = -1;
+            dispatch_group_t termGroup = dispatch_group_create();
+            dispatch_group_enter(termGroup);
+            // Removed unused weakTask (was only for earlier debug)
+            task.terminationHandler = ^(NSTask *t){
+                termStatus = (int)t.terminationStatus;
+                dispatch_group_leave(termGroup);
+            };
+            // --- END: async drain stdout/stderr ---
 
             // Set GGML Metal env to help GPU path if available
             NSMutableDictionary<NSString *, NSString *> *env = [NSMutableDictionary dictionaryWithDictionary:[[NSProcessInfo processInfo] environment]];
@@ -321,82 +414,87 @@ static NSString *EnsureManagedRuntimeAndInstall(NSString *execSrcPath) {
                 NSString *existingFB = env[@"DYLD_FALLBACK_LIBRARY_PATH"];
                 env[@"DYLD_FALLBACK_LIBRARY_PATH"] = existingFB.length ? [@[existingFB, joined] componentsJoinedByString:@":"] : joined;
             }
-            NSString *(^findMetallibDir)(void) = ^NSString *{
-                // Check bundled share first
-                if (resURL) {
-                    NSURL *a = [resURL URLByAppendingPathComponent:@"runtime/share/llama.cpp/default.metallib"];
-                    if ([fm fileExistsAtPath:a.path]) { return a.URLByDeletingLastPathComponent.path; }
-                    NSURL *b = [resURL URLByAppendingPathComponent:@"BundledRuntime/runtime/share/llama.cpp/default.metallib"];
-                    if ([fm fileExistsAtPath:b.path]) { return b.URLByDeletingLastPathComponent.path; }
-                }
-                // Managed runtime share
-                if (appSup.count > 0) {
-                    NSURL *c = [[[appSup.firstObject URLByAppendingPathComponent:@"IntPerInt/runtime/share/llama.cpp" isDirectory:YES] URLByAppendingPathComponent:@"default.metallib"] URLByStandardizingPath];
-                    if ([fm fileExistsAtPath:c.path]) { return c.URLByDeletingLastPathComponent.path; }
-                }
-                // Exec dir
-                NSString *execDir = [cli stringByDeletingLastPathComponent];
-                NSString *execMetallib = [execDir stringByAppendingPathComponent:@"default.metallib"];
-                if ([fm fileExistsAtPath:execMetallib]) { return execDir; }
-                // Homebrew share
-                NSArray<NSString *> *brew = @[@"/opt/homebrew/opt/llama.cpp/share/llama.cpp/default.metallib",
-                                              @"/usr/local/opt/llama.cpp/share/llama.cpp/default.metallib"];
-                for (NSString *p in brew) { if ([fm fileExistsAtPath:p]) { return [p stringByDeletingLastPathComponent]; } }
-                return nil;
-            };
-            NSString *resDir = findMetallibDir();
+            // Modern Metal GPU detection - check system capabilities instead of metallib files
             BOOL hasMetal = NO;
-            if (resDir.length > 0) {
-                env[@"GGML_METAL_PATH_RESOURCES"] = resDir;
-                NSString *file = [resDir stringByAppendingPathComponent:@"default.metallib"];
-                if ([fm fileExistsAtPath:file]) { env[@"GGML_METAL_PATH"] = file; hasMetal = YES; }
+            
+            // Check if Metal GPU acceleration is supported on this system
+            // Modern llama.cpp versions don't require default.metallib
+            if (@available(macOS 10.13, *)) {
+                // Check for Metal-capable devices
+                id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+                if (device != nil) {
+                    hasMetal = YES;
+                    NSLog(@"[IntPerInt] Metal GPU detected: %@", device.name);
+                    
+                    // Set Metal environment variables for optimal performance
+                    env[@"GGML_METAL_ENABLE"] = @"1";
+                    env[@"GGML_METAL_PERFORMANCE_LOGGING"] = @"0";
+                } else {
+                    NSLog(@"[IntPerInt] No Metal-capable GPU found");
+                }
+            } else {
+                NSLog(@"[IntPerInt] macOS version too old for Metal support");
             }
             // If default.metallib is not available, force CPU fallback to avoid runtime error
             if (!hasMetal) {
                 // llama.cpp uses -ngl to control GPU layers; 0 disables Metal
                 [args addObjectsFromArray:@[@"-ngl", @"0"]];
                 NSLog(@"[IntPerInt] default.metallib not found; forcing CPU fallback (-ngl 0)");
+            } else {
+                // Metal GPU is available - use maximum GPU acceleration
+                [args addObjectsFromArray:@[@"-ngl", @"-1"]];  // All layers on GPU
+                NSLog(@"[IntPerInt] Metal GPU available; using maximum GPU acceleration (-ngl -1)");
             }
             task.environment = env;
             NSLog(@"[IntPerInt] Starting task execution...");
-            BOOL launchFailed = NO;
-            @try { 
-                [task launch]; 
-                NSLog(@"[IntPerInt] Task launched successfully, waiting for completion...");
-                
-                // Set up timeout for long-running tasks (30 seconds)
-                dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 30.0 * NSEC_PER_SEC);
-                dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
-                
-                dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-                    [task waitUntilExit];
-                    dispatch_semaphore_signal(semaphore);
-                });
-                
-                long timeoutResult = dispatch_semaphore_wait(semaphore, timeout);
-                if (timeoutResult != 0) {
-                    NSLog(@"[IntPerInt] Task timed out after 30 seconds, terminating...");
+            @try {
+                [task launch];
+                NSLog(@"[IntPerInt] Task launched successfully; waiting with timeout...");
+
+                // 30s timeout
+                dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(30.0 * NSEC_PER_SEC));
+                long r = dispatch_group_wait(termGroup, timeout);
+                if (r != 0) {
+                    NSLog(@"[IntPerInt] Task timed out; sending terminate...");
                     [task terminate];
-                    [task waitUntilExit];
+                    // give it a moment, then SIGKILL if still running
+                    usleep(500 * 1000);
+                    if (task.isRunning) {
+                        NSLog(@"[IntPerInt] Still running; SIGKILL pid=%d", task.processIdentifier);
+                        kill(task.processIdentifier, SIGKILL);
+                    }
+                    // wait unbounded after kill
+                    (void)dispatch_group_wait(termGroup, DISPATCH_TIME_FOREVER);
                 }
-                
-                NSLog(@"[IntPerInt] Task completed with status: %d", task.terminationStatus);
             }
-            @catch (NSException *e) { 
+            @catch (NSException *e) {
                 NSLog(@"[IntPerInt] Task launch failed with exception: %@", e.reason);
-                launchFailed = YES; 
+                launchFailed = YES;
             }
 
-            NSData *outData = [[stdoutPipe fileHandleForReading] readDataToEndOfFile];
-            NSData *errData = [[stderrPipe fileHandleForReading] readDataToEndOfFile];
-            NSString *outStr = [[NSString alloc] initWithData:outData encoding:NSUTF8StringEncoding] ?: @"";
-            NSString *errStr = [[NSString alloc] initWithData:errData encoding:NSUTF8StringEncoding] ?: @"";
+            // Final drain (defensive): if handlers already hit EOF these will be empty
+            if (!stdoutClosed) {
+                NSData *d = [outFH availableData];
+                if (d.length) [outBuf appendData:d];
+                outFH.readabilityHandler = nil;
+            }
+            if (!stderrClosed) {
+                NSData *d = [errFH availableData];
+                if (d.length) [errBuf appendData:d];
+                errFH.readabilityHandler = nil;
+            }
 
-            NSLog(@"[IntPerInt] stdout length: %lu bytes", (unsigned long)outData.length);
-            NSLog(@"[IntPerInt] stderr length: %lu bytes", (unsigned long)errData.length);
+            NSString *outStr = [[NSString alloc] initWithData:outBuf encoding:NSUTF8StringEncoding] ?: @"";
+            NSString *errStr = [[NSString alloc] initWithData:errBuf encoding:NSUTF8StringEncoding] ?: @"";
+
+            // 安定した出力クリーニング
+            outStr = [self cleanModelOutput:outStr];
+
+            NSLog(@"[IntPerInt] stdout length: %lu bytes", (unsigned long)outBuf.length);
+            NSLog(@"[IntPerInt] stderr length: %lu bytes", (unsigned long)errBuf.length);
             if (outStr.length > 0) {
                 NSString *preview = [outStr length] > 200 ? [[outStr substringToIndex:200] stringByAppendingString:@"..."] : outStr;
-                NSLog(@"[IntPerInt] stdout preview: %@", preview);
+                NSLog(@"[IntPerInt] cleaned output preview: %@", preview);
             }
             if (errStr.length > 0) NSLog(@"[IntPerInt] stderr content: %@", errStr);
 
@@ -479,6 +577,84 @@ static NSString *EnsureManagedRuntimeAndInstall(NSString *execSrcPath) {
         _model = NULL;
     }
     */
+}
+
+//  1) strips llama/ggml logs,
+//  2) drops ANSI escape codes,
+//  3) cuts everything before the sentinel if present,
+//  4) otherwise tries to remove a verbatim echoed prompt prefix,
+//  5) trims surrounding whitespace.
+- (NSString *)cleanModelOutput:(NSString *)rawOutput {
+    if (!rawOutput || rawOutput.length == 0) return @"";
+
+    NSMutableString *s = [rawOutput mutableCopy];
+
+    // Drop trailing markers such as "EOF by user" that some models print
+    NSRegularExpression *eofLine = [NSRegularExpression regularExpressionWithPattern:@"(?mi)^.*\\bEOF by user\\b.*$" options:0 error:nil];
+    [eofLine replaceMatchesInString:s options:0 range:NSMakeRange(0, s.length) withTemplate:@""];
+
+    // 1) Strip known system log lines (llama_, ggml_, main: )
+    NSArray *systemPrefixes = @[@"llama_", @"ggml_", @"main: "];
+    for (NSString *prefix in systemPrefixes) {
+        NSString *pattern = [NSString stringWithFormat:@"(?m)^.*%@.*\\n?", [NSRegularExpression escapedPatternForString:prefix]];
+        NSRegularExpression *re = [NSRegularExpression regularExpressionWithPattern:pattern options:0 error:nil];
+        [re replaceMatchesInString:s options:0 range:NSMakeRange(0, s.length) withTemplate:@""];
+    }
+
+    // 2) Remove ANSI escape sequences (colors, cursor controls)
+    NSRegularExpression *ansi = [NSRegularExpression regularExpressionWithPattern:@"\\x1B\\[[0-9;]*[A-Za-z]" options:0 error:nil];
+    [ansi replaceMatchesInString:s options:0 range:NSMakeRange(0, s.length) withTemplate:@""];
+
+    // Prefer the assistant final channel if the model uses multi-channel tags
+    NSString *cleaned = nil;
+    NSRegularExpression *reFinal = [NSRegularExpression regularExpressionWithPattern:@"<\\|start\\|>\\s*assistant\\s*<\\|channel\\|>\\s*final\\s*<\\|message\\|>([\\s\\S]*?)(?:<\\|end\\|>|$)" options:0 error:nil];
+    NSTextCheckingResult *mFinal = [reFinal firstMatchInString:s options:0 range:NSMakeRange(0, s.length)];
+    if (mFinal && mFinal.numberOfRanges > 1) {
+        cleaned = [s substringWithRange:[mFinal rangeAtIndex:1]];
+    } else {
+        // If analysis blocks exist, drop them entirely
+        NSRegularExpression *reAnalysis = [NSRegularExpression regularExpressionWithPattern:@"<\\|start\\|>\\s*assistant\\s*<\\|channel\\|>\\s*analysis\\s*<\\|message\\|>[\\s\\S]*?(?=(<\\|start\\|>|$))" options:0 error:nil];
+        NSMutableString *tmp = [s mutableCopy];
+        [reAnalysis replaceMatchesInString:tmp options:0 range:NSMakeRange(0, tmp.length) withTemplate:@""];
+        cleaned = tmp;
+    }
+
+    // 3) If our sentinel exists, keep only the text after it
+    NSRange sentinelRange = [cleaned rangeOfString:kResponseSentinel];
+    if (sentinelRange.location != NSNotFound) {
+        NSUInteger start = NSMaxRange(sentinelRange);
+        if (start < cleaned.length) {
+            cleaned = [cleaned substringFromIndex:start];
+        } else {
+            cleaned = @"";
+        }
+    } else {
+        // 4) Heuristic: drop a verbatim echo of the prompt if present at the beginning
+        // We look for the first occurrence of the sentinel we *intended* to send in the prompt build path
+        // and, if not found, try to remove the original prompt itself (up to a safe length)
+        // Note: original prompt with sentinel appended lives in `basicPrompt` at generation time; here we conservatively
+        // strip only if the very beginning matches until a double newline.
+        NSRange delim = [cleaned rangeOfString:@"\n\n" options:0 range:NSMakeRange(0, MIN((NSUInteger)2048, cleaned.length))];
+        if (delim.location != NSNotFound && delim.location < 1024) {
+            // If the text starts by repeating what looks like our prompt header, drop it
+            // (common when models echo input before answering)
+            cleaned = [cleaned substringFromIndex:NSMaxRange(delim)];
+        }
+    }
+
+    // 5) Final trim and length guard
+    // Remove any remaining chat/template tags like <|start|> ... <|end|>
+    NSRegularExpression *tags = [NSRegularExpression regularExpressionWithPattern:@"<\\|[^|>]+(?:\\|[^|>]+)*\\|>" options:0 error:nil];
+    NSMutableString *cleanNoTags = [cleaned mutableCopy];
+    [tags replaceMatchesInString:cleanNoTags options:0 range:NSMakeRange(0, cleanNoTags.length) withTemplate:@""];
+    cleaned = cleanNoTags;
+
+    cleaned = [cleaned stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (cleaned.length > 100000) { // hard guard to avoid huge accidental dumps in UI
+        cleaned = [[cleaned substringToIndex:100000] stringByAppendingString:@"…"];
+    }
+
+    return cleaned.length > 0 ? cleaned : @"（応答を生成できませんでした）";
 }
 
 - (void)dealloc {

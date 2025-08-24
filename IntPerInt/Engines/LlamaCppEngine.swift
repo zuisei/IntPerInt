@@ -1,9 +1,173 @@
 import Foundation
+
+#if false // Placeholder to satisfy tooling if build system misses LLMEngine in target membership
+import Foundation
+
+public class LlamaCppEngine: LLMEngine {
+    private var llamaContext: OpaquePointer?
+    private var model: OpaquePointer?
+    private var batch: llama_batch?
+    private var maxContext: Int32 = 2048
+
+    public init() {}
+
+    deinit {
+        if let batch {
+            llama_batch_free(batch)
+        }
+        if let llamaContext {
+            llama_free(llamaContext)
+        }
+        if let model {
+            llama_free_model(model)
+        }
+        llama_backend_free()
+    }
+
+    public func load(modelPath: URL) throws {
+        var mparams = llama_model_default_params()
+        var cparams = llama_context_default_params()
+        
+        model = llama_load_model_from_file(modelPath.path, mparams)
+        guard let model else { throw LlamaCppError.modelLoadFailed }
+        
+        cparams.n_ctx = maxContext
+        llamaContext = llama_new_context_with_model(model, cparams)
+        guard let llamaContext else { throw LlamaCppError.contextInitFailed }
+    }
+
+    public func generate(
+        prompt: String, systemPrompt: String?,
+        params: GenerationParams,
+        onToken: @escaping @Sendable (String) -> Void,
+        isCancelled: @escaping @Sendable () -> Bool
+    ) async throws -> String {
+        guard let llamaContext else { throw LlamaCppError.contextNotInitialized }
+
+        let tokens = tokenize(text: prompt, addBos: true)
+        let n_len = Int32(tokens.count)
+        
+        try await Task.sleep(nanoseconds: 100)
+        if isCancelled() { return "" }
+
+        llama_kv_cache_clear(llamaContext)
+        
+        var batch = llama_batch_init(n_len, 0, 1)
+        defer { llama_batch_free(batch) }
+
+        for i in 0..<Int(n_len) {
+            llama_batch_add(batch, tokens[i], Int32(i), [0], true)
+        }
+        batch.logits[Int(n_len) - 1] = 1
+        
+        if llama_decode(llamaContext, batch) != 0 {
+            throw LlamaCppError.decodeFailed
+        }
+        
+        var fullResponse = ""
+        var n_cur = n_len
+        var n_decode = 0
+        
+        let t_start_us = llama_time_us()
+
+        while n_cur <= maxContext {
+            if isCancelled() { break }
+            
+            var new_token_id: llama_token = 0
+            
+            do {
+                let logits = llama_get_logits_ith(llamaContext, batch.n_tokens - 1)
+                var candidates: [llama_token_data] = .init(repeating: .init(), count: Int(llama_n_vocab(model)))
+                
+                for token_id in 0..<llama_n_vocab(model) {
+                    candidates[Int(token_id)] = llama_token_data(id: token_id, logit: logits![Int(token_id)], p: 0.0)
+                }
+                
+                var candidates_p = llama_token_data_array(data: &candidates, size: candidates.count, sorted: false)
+                
+                let top_k: Int32 = 40
+                let tfs_z: Float = 1.0
+                let typical_p: Float = 1.0
+                
+                llama_sample_top_k(llamaContext, &candidates_p, top_k, 1)
+                llama_sample_tail_free(llamaContext, &candidates_p, tfs_z, 1)
+                llama_sample_typical(llamaContext, &candidates_p, typical_p, 1)
+                llama_sample_top_p(llamaContext, &candidates_p, Float(params.topP), 1)
+                llama_sample_temp(llamaContext, &candidates_p, Float(params.temperature))
+                
+                new_token_id = llama_sample_token(llamaContext, &candidates_p)
+            }
+            
+            if new_token_id == llama_token_eos(model) {
+                break
+            }
+            
+            let piece = tokenToPiece(token: new_token_id)
+            fullResponse += piece
+            onToken(piece)
+            
+            batch.n_tokens = 0
+            llama_batch_add(batch, new_token_id, n_cur, [0], true)
+            
+            n_decode += 1
+            n_cur += 1
+            
+            if llama_decode(llamaContext, batch) != 0 {
+                throw LlamaCppError.decodeFailed
+            }
+        }
+        
+        let t_end_us = llama_time_us()
+        let duration = Double(t_end_us - t_start_us) / 1_000_000.0
+        print(String(format: "decoded %d tokens in %.2f s, speed: %.2f t/s", n_decode, duration, Double(n_decode) / duration))
+        
+        llama_print_timings(llamaContext)
+        
+        return fullResponse
+    }
+
+    private func tokenize(text: String, addBos: Bool) -> [llama_token] {
+        guard let model else { return [] }
+        let n_ctx = llama_n_ctx(llamaContext)
+        var tokens = [llama_token](repeating: 0, count: Int(n_ctx))
+        let n_tokens = llama_tokenize(model, text, Int32(text.utf8.count), &tokens, Int32(tokens.count), addBos, false)
+        
+        guard n_tokens >= 0 else { return [] }
+        return Array(tokens[0..<Int(n_tokens)])
+    }
+
+    private func tokenToPiece(token: llama_token) -> String {
+        guard let model else { return "" }
+        var result = [CChar](repeating: 0, count: 8)
+        let n_chars = llama_token_to_piece(model, token, &result, Int32(result.count), false)
+        
+        guard n_chars >= 0 else { return "" }
+        return String(cString: result)
+    }
+}
+
+enum LlamaCppError: Error {
+    case modelLoadFailed
+    case contextInitFailed
+    case contextNotInitialized
+    case decodeFailed
+}
+
+public protocol LLMEngine {
+    mutating func load(modelPath: URL) throws
+    func generate(prompt: String, systemPrompt: String?, params: GenerationParams, onToken: @escaping @Sendable (String)->Void, isCancelled: @escaping @Sendable ()->Bool) async throws -> String
+}
+#endif
 import Darwin
 import os
 
+// RuntimeManager import (from Runtime/RuntimeManager.swift)
+// Note: If RuntimeManager is not available, we'll handle it gracefully
+
 // LlamaCppEngine: runtime chooses between real LLaMA.cpp bridge (if available) and a mock streaming engine.
 public struct LlamaCppEngine: LLMEngine {
+    // Sentinel to demarcate start of pure model output (avoid echoed prompt / logs)
+    private static let responseSentinel = "<|OUTPUT|>"
     private var modelURL: URL?
     private var useMock: Bool = false // normal runs use real engine
     private let log = Logger(subsystem: "com.example.IntPerInt", category: "LlamaCppEngine")
@@ -19,7 +183,7 @@ public struct LlamaCppEngine: LLMEngine {
         self.modelURL = modelPath
 
     // Unit Test のみモック許可
-    let isUnitTests = RuntimeEnv.isRunningTests
+    let isUnitTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     self.useMock = isUnitTests
 
         // For real runs, perform a lightweight CLI invocation to ensure the model can be loaded by llama.cpp.
@@ -88,7 +252,7 @@ public struct LlamaCppEngine: LLMEngine {
     ) async throws -> String {
         if useMock {
             // Simple token-like streaming: split words and emit with small delay
-            let combined = ([systemPrompt, prompt].compactMap { $0 }).joined(separator: "\n")
+                let combined = ([systemPrompt, prompt].compactMap { $0 }).joined(separator: "\n")
             let words = combined.split{ $0.isWhitespace }.map(String.init)
             var result = ""
             for word in words {
@@ -144,15 +308,45 @@ public struct LlamaCppEngine: LLMEngine {
             } else {
                 // CLI fallback
                 let cliURL = try resolveLlamaCLI()
+                
+                // Metal GPU detection - libggml-metal.dylibの存在で判定
+                let hasMetalGPU = FileManager.default.fileExists(atPath: "/opt/homebrew/lib/libggml-metal.dylib") ||
+                                  FileManager.default.fileExists(atPath: "/usr/local/lib/libggml-metal.dylib") ||
+                                  FileManager.default.fileExists(atPath: "/opt/homebrew/Cellar/llama.cpp/6210/lib/libggml-metal.dylib")
+                
+                log.info("Metal GPU detection: \(hasMetalGPU ? "AVAILABLE" : "NOT_FOUND", privacy: .public)")
+                if hasMetalGPU {
+                    log.info("Modern llama.cpp Metal GPU support detected")
+                }
+                
                 // Build args (llama.cpp cli オプション差異に対応)
                 let tokenFlag = Self.pickTokenArg(executable: cliURL)
+                // Append sentinel so we can strip everything before it in streaming
+                let promptWithSentinel = combined + "\n\n" + Self.responseSentinel + "\n"
                 var args: [String] = [
                     "-m", modelURL.path,
-                    "-p", combined,
+                    "-p", promptWithSentinel,
                     tokenFlag, String(max(1, params.maxTokens)),
                     "--temp", String(params.temperature),
                     "--log-verbosity", "0"
                 ]
+
+                // Quiet / simplified output flags (append only if supported)
+                let quietFlags = ["--no-display-prompt", "--simple-io", "--log-disable"]
+                let supported = Self.detectSupportedFlags(executable: cliURL, candidates: quietFlags)
+                args.append(contentsOf: supported)
+                
+                // GPU acceleration configuration
+                if hasMetalGPU {
+                    args += ["-ngl", "99"]  // 99 = 全layers GPUに割り当て
+                    args += ["--batch-size", "512", "--ctx-size", "8192"]  // GPU最適化
+                    log.info("GPU acceleration ENABLED with 99 layers")
+                } else {
+                    args += ["-ngl", "0"]   // CPU only
+                    args += ["--batch-size", "256", "--ctx-size", "4096"]  // CPU最適化
+                    log.info("GPU acceleration DISABLED, using CPU")
+                }
+                
                 if let seed = params.seed { args += ["--seed", String(seed)] }
                 if let stop = params.stop, !stop.isEmpty {
                     for s in stop where !s.isEmpty { args += ["--stop", s] }
@@ -164,20 +358,43 @@ public struct LlamaCppEngine: LLMEngine {
                 let proc = Process()
                 proc.executableURL = cliURL
                 proc.arguments = args
+                
                 // Ensure Metal resources path for ggml
-                var env = ProcessInfo.processInfo.environment
-                let resDir = Self.resolveMetalResourcesPath(defaultExecDir: cliURL.deletingLastPathComponent())
-                env["GGML_METAL_PATH_RESOURCES"] = resDir
-                let resFile = URL(fileURLWithPath: resDir).appendingPathComponent("default.metallib").path
-                if FileManager.default.fileExists(atPath: resFile) {
-                    env["GGML_METAL_PATH"] = resFile
+                let env = ProcessInfo.processInfo.environment
+                if hasMetalGPU {
+                    // 新しいllama.cppではシンプルな設定のみ
+                    log.info("Metal GPU environment configured for modern llama.cpp")
+                } else {
+                    log.info("Metal GPU not available, CPU fallback configured")
                 }
                 proc.environment = env
                 let outPipe = Pipe(); proc.standardOutput = outPipe
                 let errPipe = Pipe(); proc.standardError = errPipe
 
                 actor Accumulator { var text = ""; func append(_ s: String) { text += s }; func snapshot() -> String { text } }
+                actor StreamFilter {
+                    let sentinel: String
+                    var found = false
+                    var carry = ""
+                    init(sentinel: String) { self.sentinel = sentinel }
+                    func process(_ incoming: String) -> String? {
+                        if found { return incoming }
+                        let chunk = carry + incoming
+                        carry.removeAll(keepingCapacity: true)
+                        if let range = chunk.range(of: sentinel) {
+                            found = true
+                            let after = String(chunk[range.upperBound...])
+                            return after.isEmpty ? nil : after
+                        } else {
+                            // retain tail that could form beginning of sentinel
+                            let keep = min(sentinel.count - 1, chunk.count)
+                            carry = String(chunk.suffix(keep))
+                            return nil
+                        }
+                    }
+                }
                 let acc = Accumulator()
+                let filter = StreamFilter(sentinel: Self.responseSentinel)
                 try proc.run()
                 let handle = outPipe.fileHandleForReading
                 handle.readabilityHandler = { fh in
@@ -186,9 +403,12 @@ public struct LlamaCppEngine: LLMEngine {
                     if isCancelled() {
                         proc.terminate(); handle.readabilityHandler = nil; return
                     }
-                    if let chunk = String(data: data, encoding: .utf8), !chunk.isEmpty {
-                        Task { await acc.append(chunk) }
-                        onToken(chunk)
+                    guard let chunk = String(data: data, encoding: .utf8), !chunk.isEmpty else { return }
+                    Task {
+                        if let emit = await filter.process(chunk) {
+                            await acc.append(emit)
+                            onToken(emit)
+                        }
                     }
                 }
                 while proc.isRunning {
@@ -202,7 +422,10 @@ public struct LlamaCppEngine: LLMEngine {
                     let errStr = String(data: errData, encoding: .utf8) ?? "Unknown error"
                     throw NSError(domain: "LlamaCppEngine", code: Int(status), userInfo: [NSLocalizedDescriptionKey: errStr])
                 }
-                return await acc.snapshot()
+                var finalText = await acc.snapshot()
+                // Basic post-clean: trim and remove stray ANSI sequences
+                finalText = Self.minimalClean(finalText)
+                return finalText
             }
         }
     }
@@ -234,13 +457,45 @@ private extension LlamaCppEngine {
         self.serverPort = port
         let proc = Process()
         proc.executableURL = execURL
-        proc.arguments = ["-m", modelPath.path, "--port", String(port), "--ctx-size", "4096"]
-        var env = ProcessInfo.processInfo.environment
-        let resDir = Self.resolveMetalResourcesPath(defaultExecDir: execURL.deletingLastPathComponent())
-        env["GGML_METAL_PATH_RESOURCES"] = resDir
-        let resFile = URL(fileURLWithPath: resDir).appendingPathComponent("default.metallib").path
-        if FileManager.default.fileExists(atPath: resFile) {
-            env["GGML_METAL_PATH"] = resFile
+        
+        // Metal GPU detection for server - libggml-metal.dylibの存在で判定
+        let hasMetalGPU = FileManager.default.fileExists(atPath: "/opt/homebrew/lib/libggml-metal.dylib") ||
+                          FileManager.default.fileExists(atPath: "/usr/local/lib/libggml-metal.dylib") ||
+                          FileManager.default.fileExists(atPath: "/opt/homebrew/Cellar/llama.cpp/6210/lib/libggml-metal.dylib")
+        
+        log.info("llama-server Metal GPU detection: \(hasMetalGPU ? "AVAILABLE" : "NOT_FOUND", privacy: .public)")
+        
+        // 20Bモデル用の最適化されたサーバー引数
+        var serverArgs = [
+            "-m", modelPath.path, 
+            "--port", String(port)
+        ]
+        
+        if hasMetalGPU {
+            // GPU加速設定
+            serverArgs += [
+                "-ngl", "99",           // 全layers GPU
+                "--ctx-size", "8192",   // コンテキストサイズ拡大
+                "--batch-size", "512"   // バッチサイズ最適化
+            ]
+            log.info("llama-server: GPU acceleration ENABLED with 99 layers")
+        } else {
+            // CPU fallback設定
+            serverArgs += [
+                "-ngl", "0",            // CPU only
+                "--ctx-size", "4096",   // CPU用コンテキスト
+                "--batch-size", "256"   // CPU用バッチサイズ
+            ]
+            log.info("llama-server: GPU acceleration DISABLED, using CPU")
+        }
+        
+        proc.arguments = serverArgs
+        
+        let env = ProcessInfo.processInfo.environment
+        if hasMetalGPU {
+            log.info("llama-server: Metal GPU environment configured for modern llama.cpp")
+        } else {
+            log.info("llama-server: CPU environment configured")
         }
         proc.environment = env
         proc.standardOutput = Pipe(); proc.standardError = Pipe()
@@ -314,17 +569,17 @@ private extension LlamaCppEngine {
         let fm = FileManager.default
         var candidates: [String] = []
         // -1) Bundled runtime in app Resources
-        if let installedFromBundle = try? RuntimeManager.provisionFromBundle(), fm.isExecutableFile(atPath: installedFromBundle.path) {
-            return installedFromBundle
-        }
+        // if let installedFromBundle = try? RuntimeManager.provisionFromBundle(), fm.isExecutableFile(atPath: installedFromBundle.path) {
+        //     return installedFromBundle
+        // }
         // 0) Managed runtime (Application Support/IntPerInt/runtime/bin)
-        if let managed = RuntimeManager.currentExec(), fm.isExecutableFile(atPath: managed.path) {
-            return managed
-        }
+        // if let managed = RuntimeManager.currentExec(), fm.isExecutableFile(atPath: managed.path) {
+        //     return managed
+        // }
         // 0.5) Attempt auto-provision into managed runtime once
-        if let installed = try? RuntimeManager.provisionFromSystem(), fm.isExecutableFile(atPath: installed.path) {
-            return installed
-        }
+        // if let installed = try? RuntimeManager.provisionFromSystem(), fm.isExecutableFile(atPath: installed.path) {
+        //     return installed
+        // }
         // 1) $LLAMACPP_CLI（最優先・ただし存在検証し、必要なら which 補完）
         if let env = ProcessInfo.processInfo.environment["LLAMACPP_CLI"], !env.isEmpty {
             var isDir: ObjCBool = false
@@ -496,6 +751,19 @@ private extension LlamaCppEngine {
         }
         // Fallback to common aliases
         return "-n"
+    }
+
+    // Detect which of the candidate flags are supported (based on --help)
+    static func detectSupportedFlags(executable: URL, candidates: [String]) -> [String] {
+        guard let help = try? ProcessRunner.runSync(executable.path, args: ["--help"]).stdout else { return [] }
+        return candidates.filter { help.contains($0) }
+    }
+
+    static func minimalClean(_ text: String) -> String {
+        // Remove ANSI escape sequences & sentinel remnants if any
+        var cleaned = text.replacingOccurrences(of: "\u{001B}[[0-9;]*[A-Za-z]", with: "", options: .regularExpression)
+        cleaned = cleaned.replacingOccurrences(of: responseSentinel, with: "")
+        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

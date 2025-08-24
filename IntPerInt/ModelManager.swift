@@ -4,15 +4,15 @@ import os
 import AppKit
 
 // インストール済みモデルの情報
-struct InstalledModel: Identifiable, Hashable {
-    let id = UUID()
-    let name: String      // 表示名
-    let fileName: String  // 実ファイル名
-    let url: URL
+public struct InstalledModel: Identifiable, Hashable {
+    public let id = UUID()
+    public let name: String      // 表示名
+    public let fileName: String  // 実ファイル名
+    public let url: URL
 }
 
 @MainActor
-class ModelManager: ObservableObject {
+public class ModelManager: ObservableObject {
     // 会話管理
     @Published var conversations: [Conversation] = [Conversation()]
     @Published var selectedConversationID: Conversation.ID? = nil
@@ -40,7 +40,15 @@ class ModelManager: ObservableObject {
     @Published var engineStatus: EngineStatus = .idle
 
     // Engine and task management
-    private var engine: LLMEngine = LlamaCppLibEngine()
+    private var engine: LLMEngine = {
+        // UDS ソケットが存在するなら helper 経由エンジンを優先
+        let sock = "/tmp/intperint.sock"
+        if FileManager.default.fileExists(atPath: sock) {
+            return UDSLLMEngine(sockPath: sock)
+        } else {
+            return LlamaCppLibEngine()
+        }
+    }()
     private var currentModelPath: URL? = nil
     private var currentGenerationTask: Task<Void, Never>? = nil
     private let logger = Logger(subsystem: "com.example.IntPerInt", category: "ModelManager")
@@ -53,7 +61,6 @@ class ModelManager: ObservableObject {
 
     // Track in-flight downloads and delegates for progress/cancel
     private var downloadTasks: [String: URLSessionDownloadTask] = [:]
-    private var downloadDelegates: [String: DownloadDelegate] = [:]
     private var saveDebounceWorkItem: Task<Void, Never>? = nil
     // 通知の重複抑止
     private var lastNotificationTimestamps: [String: Date] = [:]
@@ -62,9 +69,9 @@ class ModelManager: ObservableObject {
     private var fileSystemMonitor: DispatchSourceFileSystemObject? = nil
 
     init() {
-        // Create models directory in user's Application Support folder
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        modelsDirectory = appSupport.appendingPathComponent("IntPerInt/Models")
+        // ユーザーのDocumentsディレクトリ内にModelsフォルダを作成
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        modelsDirectory = documentsPath.appendingPathComponent("IntPerInt/Models")
         try? FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
 
     // CLIの自動検出は廃止（libエンジンを優先使用）
@@ -78,6 +85,9 @@ class ModelManager: ObservableObject {
         
         // ファイルシステム監視を開始（モデル追加時の自動再読み込み用）
         startFileSystemMonitoring()
+        
+        // 初期化時にローカルモデルを読み込む
+        loadAvailableModels()
     }
     
     // デイニシャライザーでリソース解放
@@ -99,67 +109,6 @@ class ModelManager: ObservableObject {
 
     var hasAnyLocalModel: Bool { !installedModels.isEmpty }
     
-    func downloadModel(_ modelName: String) {
-        guard let modelInfo = ModelInfo.availableModels.first(where: { $0.name == modelName }),
-              !downloadingModels.contains(modelName),
-              downloadTasks[modelName] == nil else { return }
-
-        let url = URL(string: "https://huggingface.co/\(modelInfo.huggingFaceRepo)/resolve/main/\(modelInfo.fileName)")!
-        let destination = modelsDirectory.appendingPathComponent(modelInfo.fileName)
-
-        downloadingModels.insert(modelName)
-        downloadProgress[modelName] = 0.0
-
-    let delegate = DownloadDelegate(modelName: modelName, destinationURL: destination,
-                    onProgress: { [weak self] (name: String, progress: Double, mbps: Double, expected: Int64, written: Int64) in
-                                            Task { @MainActor in
-                        self?.downloadProgress[name] = progress
-                        self?.downloadSpeed[name] = mbps
-                        if expected > 0 { self?.downloadExpectedBytes[name] = expected }
-                        self?.downloadReceivedBytes[name] = written
-                                            }
-                                        },
-                                        onComplete: { [weak self] (name: String, result: Result<URL, Error>) in
-                                            Task { @MainActor in
-                                                guard let self else { return }
-                                                self.downloadingModels.remove(name)
-                                                self.downloadTasks[name] = nil
-                                                self.downloadDelegates[name] = nil
-                        self.downloadSpeed.removeValue(forKey: name)
-                        self.downloadExpectedBytes.removeValue(forKey: name)
-                        self.downloadReceivedBytes.removeValue(forKey: name)
-                                                switch result {
-                                                case .success:
-                                                    self.downloadProgress.removeValue(forKey: name)
-                                                    self.loadAvailableModels()
-                                                case .failure(let error):
-                                                    print("Download failed: \(error)")
-                                                    self.downloadProgress.removeValue(forKey: name)
-                                                }
-                                            }
-                                        })
-
-        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
-        let task = session.downloadTask(with: url)
-        downloadDelegates[modelName] = delegate
-        downloadTasks[modelName] = task
-        task.resume()
-    }
-
-    func cancelDownload(_ modelName: String) {
-        if let task = downloadTasks[modelName] {
-            task.cancel()
-        }
-        downloadTasks[modelName] = nil
-        downloadDelegates[modelName] = nil
-        downloadingModels.remove(modelName)
-        downloadProgress.removeValue(forKey: modelName)
-    downloadSpeed.removeValue(forKey: modelName)
-    downloadExpectedBytes.removeValue(forKey: modelName)
-    downloadReceivedBytes.removeValue(forKey: modelName)
-    }
-
-    // ローカルに保存されたモデルを削除
     func deleteInstalledModel(_ fileName: String) {
         let target = modelsDirectory.appendingPathComponent(fileName)
         do {
@@ -168,7 +117,7 @@ class ModelManager: ObservableObject {
             }
             // このモデルを参照している会話を解除
             for i in conversations.indices {
-                if conversations[i].modelName == fileName { conversations[i].modelName = nil }
+                if conversations[i].model == fileName { conversations[i].model = nil }
             }
             // 現在ロード中モデルに一致するならエンジン状態をリセット
             if currentModelPath?.path == target.path {
@@ -213,7 +162,7 @@ class ModelManager: ObservableObject {
     // モデルのロードは初回生成時に遅延実行（ここでは行わない）
     }
 
-    func sendMessage(_ content: String, using modelName: String, provider: AIProvider) {
+    func sendMessage(_ content: String, using modelName: String, provider: AIProvider, params: GenerationParams? = nil) {
         // 1. 即座にユーザーメッセージをUIに追加（UI応答性向上）
         let userMessage = ChatMessage(content: content, isUser: true)
         messages.append(userMessage)
@@ -227,7 +176,7 @@ class ModelManager: ObservableObject {
 
         // 4. バックグラウンドで生成処理を開始（UIをブロックしない）
         currentGenerationTask = Task {
-            let params = GenerationParams()
+            let generationParams = params ?? GenerationParams()
             let isCancelled: @Sendable () -> Bool = {
                 return Task.isCancelled
             }
@@ -236,7 +185,7 @@ class ModelManager: ObservableObject {
                 // エンジン準備
                 try await self.prepareEngineIfNeeded()
 
-                _ = try await self.engine.generate(prompt: content, systemPrompt: nil, params: params, onToken: { token in
+                _ = try await self.engine.generate(prompt: content, systemPrompt: nil, params: generationParams, onToken: { token in
                     Task { @MainActor in
                         // ストリーミングでトークンを即座にUIに反映
                         if let last = self.messages.last, !last.isUser {
@@ -288,10 +237,11 @@ class ModelManager: ObservableObject {
         Task { @MainActor in self.isGenerating = false }
     }
 
+
     func setCurrentModelForSelectedConversation(name: String) {
         guard let id = selectedConversationID,
               let idx = conversations.firstIndex(where: { $0.id == id }) else { return }
-        conversations[idx].modelName = name
+    conversations[idx].model = name
     // ロードは sendMessage 内で遅延実行
     }
 
@@ -316,7 +266,7 @@ class ModelManager: ObservableObject {
     private func prepareEngineIfNeeded() async throws {
         guard let id = selectedConversationID,
               let conv = conversations.first(where: { $0.id == id }),
-              let modelName = conv.modelName else { return }
+              let modelName = conv.model else { return }
 
         // resolve model file path
         let candidate = modelsDirectory.appendingPathComponent(modelName)
@@ -460,8 +410,20 @@ extension ModelManager {
     }
 
     func refreshInstalledModels() {
-        guard let contents = try? FileManager.default.contentsOfDirectory(at: modelsDirectory, includingPropertiesForKeys: [.fileSizeKey], options: .skipsHiddenFiles) else { return }
+        print("🔍 Scanning for models in: \(modelsDirectory.path)")
+        
+        guard let contents = try? FileManager.default.contentsOfDirectory(at: modelsDirectory, includingPropertiesForKeys: [.fileSizeKey], options: .skipsHiddenFiles) else { 
+            print("❌ Failed to read directory: \(modelsDirectory.path)")
+            return 
+        }
+        
+        print("📁 Found \(contents.count) files in directory")
+        for item in contents {
+            print("  - \(item.lastPathComponent)")
+        }
+        
         let ggufs = contents.filter { $0.pathExtension.lowercased() == "gguf" }
+        print("🔍 Found \(ggufs.count) GGUF files")
         
         // 分割ファイルパターン: -00001-of-00002.gguf形式を検出
         let splitFilePattern = #"-\d{5}-of-\d{5}\.gguf$"#
@@ -500,6 +462,11 @@ extension ModelManager {
         }
         
         installedModels = built.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        
+        print("✅ Final installed models count: \(installedModels.count)")
+        for model in installedModels {
+            print("  📦 \(model.name) (\(model.fileName))")
+        }
 
         // compute total size
         var total: Int64 = 0
@@ -578,5 +545,3 @@ extension ModelManager {
         self.validInstalledModels = self.installedModels
     }
 }
-
-// DownloadDelegate is defined in Services/DownloadDelegate.swift

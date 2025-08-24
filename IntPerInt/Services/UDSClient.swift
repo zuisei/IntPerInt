@@ -1,115 +1,49 @@
 import Foundation
-import Network
 
-enum UDSClientError: Error { case notConnected, invalidResponse }
+/// JSON Lines クライアント (UNIX Domain Socket)
+final class UDSClient: @unchecked Sendable {
+    private let socketPath: String
+    init(socketPath: String = "/tmp/intperint.sock") { self.socketPath = socketPath }
 
-final class UDSClient {
-    private let path: String
-    private var connection: NWConnection?
-    private let queue = DispatchQueue(label: "uds.client.queue")
+    enum UDSClientError: Error { case connectFailed, writeFailed, readFailed, timeout }
 
-    init(path: String = "/tmp/intperint.sock") { self.path = path }
-
-    func connect(completion: @escaping (Error?) -> Void) {
-        let endpoint = NWEndpoint.unix(path: path)
-        let params = NWParameters(tls: nil, tcp: NWProtocolTCP.Options())
-        params.allowLocalEndpointReuse = true
-        let conn = NWConnection(to: endpoint, using: params)
-        self.connection = conn
-        conn.stateUpdateHandler = { state in
-            switch state {
-            case .ready: completion(nil)
-            case .failed(let e): completion(e)
-            case .cancelled:
-                completion(NSError(domain: "UDS", code: -1, userInfo: [NSLocalizedDescriptionKey: "cancelled"]))
-            default: break
-            }
+    /// 1リクエスト (複数行応答想定時は handler で逐次処理)
+    func sendLines(lines: [String], onLine: @escaping (String)->Void) throws {
+        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        if fd < 0 { throw UDSClientError.connectFailed }
+        var addr = sockaddr_un(); addr.sun_family = sa_family_t(AF_UNIX)
+        let pathData = socketPath.utf8
+        guard pathData.count < MemoryLayout.size(ofValue: addr.sun_path) else { throw UDSClientError.connectFailed }
+        withUnsafeMutableBytes(of: &addr.sun_path) { buf in
+            buf.copyBytes(from: pathData)
+            buf[pathData.count] = 0
         }
-        conn.start(queue: queue)
-    }
-
-    func close() { connection?.cancel(); connection = nil }
-
-    // single request -> single line response
-    func send(json: [String: Any], timeout: TimeInterval = 15, completion: @escaping ([String: Any]?, Error?) -> Void) {
-        guard let conn = connection else { completion(nil, UDSClientError.notConnected); return }
-        do {
-            let data = try JSONSerialization.data(withJSONObject: json, options: [])
-            var payload = Data(); payload.append(data); payload.append(0x0A)
-            conn.send(content: payload, completion: .contentProcessed { sendErr in
-                if let e = sendErr { completion(nil, e); return }
-                self.receiveOneJSON(conn: conn, timeout: timeout, completion: completion)
-            })
-        } catch { completion(nil, error) }
-    }
-
-    // request -> streaming multiple JSON lines
-    func sendAndStream(json: [String: Any], onEvent: @escaping ([String: Any]) -> Void, onDone: @escaping (Error?) -> Void) {
-        guard let conn = connection else { onDone(UDSClientError.notConnected); return }
-        do {
-            let data = try JSONSerialization.data(withJSONObject: json, options: [])
-            var payload = Data(); payload.append(data); payload.append(0x0A)
-            conn.send(content: payload, completion: .contentProcessed { sendErr in
-                if let e = sendErr { onDone(e); return }
-                self.receiveStream(conn: conn, onEvent: onEvent, onDone: onDone)
-            })
-        } catch { onDone(error) }
-    }
-
-    private func receiveOneJSON(conn: NWConnection, timeout: TimeInterval, completion: @escaping ([String: Any]?, Error?) -> Void) {
-        var buffer = Data()
-        let deadline = Date().addingTimeInterval(timeout)
-        func loop() {
-            conn.receive(minimumIncompleteLength: 1, maximumLength: 8192) { content, _, _, err in
-                if let e = err { completion(nil, e); return }
-                if let content = content {
-                    buffer.append(content)
-                    if let idx = buffer.firstIndex(of: 0x0A) {
-                        let line = buffer.subdata(in: 0..<idx)
-                        do {
-                            if let obj = try JSONSerialization.jsonObject(with: line) as? [String: Any] {
-                                completion(obj, nil)
-                            } else { completion(nil, UDSClientError.invalidResponse) }
-                        } catch { completion(nil, error) }
-                        return
-                    }
-                    if Date() > deadline {
-                        completion(nil, NSError(domain: "UDS", code: 2, userInfo: [NSLocalizedDescriptionKey: "timeout receiving"]))
-                        return
-                    }
-                    loop()
-                } else {
-                    completion(nil, NSError(domain: "UDS", code: 3, userInfo: [NSLocalizedDescriptionKey: "no content"]))
+        let size = socklen_t(MemoryLayout<UInt8>.size + MemoryLayout<sa_family_t>.size + pathData.count + 1)
+        let rc = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, size) }
+        }
+        if rc != 0 { close(fd); throw UDSClientError.connectFailed }
+        // write
+        for l in lines {
+            let line = l.hasSuffix("\n") ? l : l + "\n"
+            line.withCString { cstr in _ = write(fd, cstr, strlen(cstr)) }
+        }
+        // read until EOF (caller decides when to stop by server semantics)
+        let bufSize = 4096
+        var data = Data(); data.reserveCapacity(bufSize)
+        var tmp = [UInt8](repeating: 0, count: bufSize)
+        while true {
+            let n = read(fd, &tmp, bufSize)
+            if n > 0 {
+                data.append(contentsOf: tmp[0..<n])
+                // dispatch complete lines
+                while let range = data.firstRange(of: Data([0x0a])) { // \n
+                    let lineData = data.subdata(in: 0..<range.lowerBound)
+                    if let s = String(data: lineData, encoding: .utf8) { onLine(s) }
+                    data.removeSubrange(0..<range.upperBound)
                 }
-            }
+            } else if n == 0 { break } else { break }
         }
-        loop()
-    }
-
-    private func receiveStream(conn: NWConnection, onEvent: @escaping ([String: Any]) -> Void, onDone: @escaping (Error?) -> Void) {
-        var buffer = Data()
-        func loop() {
-            conn.receive(minimumIncompleteLength: 1, maximumLength: 8192) { content, _, _, err in
-                if let e = err { onDone(e); return }
-                guard let content = content, !content.isEmpty else { onDone(NSError(domain: "UDS", code: 5, userInfo: [NSLocalizedDescriptionKey: "no content"])) ; return }
-                buffer.append(content)
-                while let idx = buffer.firstIndex(of: 0x0A) {
-                    let line = buffer.subdata(in: 0..<idx)
-                    buffer.removeSubrange(0...idx)
-                    if let obj = try? JSONSerialization.jsonObject(with: line) as? [String: Any] {
-                        if let op = obj["op"] as? String {
-                            if op == "done" { onDone(nil); return }
-                            else if op == "error" {
-                                let msg = (obj["error"] as? String) ?? "error"
-                                onDone(NSError(domain: "UDS", code: 6, userInfo: [NSLocalizedDescriptionKey: msg])); return
-                            }
-                        }
-                        onEvent(obj)
-                    }
-                }
-                loop()
-            }
-        }
-        loop()
+        close(fd)
     }
 }

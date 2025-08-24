@@ -541,6 +541,60 @@ static void serve_client(int cfd, const std::string& cfg) {
                     handle_start_chat(req, cfd, cfg);
                 } else if (op == "stop_chat" || op == "cancel") {
                     handle_cancel_chat(req, cfd);
+                } else if (op == "vqa") {
+                    // vqa_blip2 テンプレートを実行して単一回答を返す（同期）
+                    std::string image = json_get_string(req, "image");
+                    std::string question = json_get_string(req, "question");
+                    std::string tmpl = cfg_get(cfg, "vqa_blip2", "");
+                    if (tmpl.empty()) tmpl = cfg_get_in_cmd_templates(cfg, "vqa_blip2");
+                    if (tmpl.empty()) {
+                        std::string s = "{\"op\":\"error\",\"error\":\"vqa_blip2 template missing\"}\n"; ::write(cfd, s.c_str(), s.size());
+                    } else {
+                        std::map<std::string,std::string> kv {{"IMAGE", image},{"QUESTION", escape_quotes(question)}};
+                        std::string cmd = build_cmd(tmpl, kv);
+                        fs::path log = fs::path(outputs_base_from_cfg(cfg))/"vqa.log";
+                        int rc = run_system_logged(cmd, log);
+                        if (rc==0) {
+                            // スクリプトは JSON を標準出力する想定。最終行をそのまま中継。
+                            std::string out = read_file(log);
+                            std::string answer;
+                            // 最後の { から抽出する乱暴な方法
+                            auto p = out.rfind('{');
+                            if (p!=std::string::npos) answer = out.substr(p);
+                            if (answer.empty()) answer = std::string("{\"op\":\"done\",\"answer\":\"unknown\"}");
+                            if (answer.back()!='\n') answer.push_back('\n');
+                            ::write(cfd, answer.c_str(), answer.size());
+                        } else {
+                            std::string s = std::string("{\"op\":\"error\",\"error\":\"vqa failed rc=") + std::to_string(rc) + "\"}\n"; ::write(cfd, s.c_str(), s.size());
+                        }
+                    }
+                } else if (op == "rag_index" || op == "rag_query") {
+                    // rag worker ラッパー
+                    std::string subop = (op=="rag_index")?"index":"query";
+                    std::string tmpl = cfg_get(cfg, "rag", "");
+                    if (tmpl.empty()) tmpl = cfg_get_in_cmd_templates(cfg, "rag");
+                    if (tmpl.empty()) {
+                        std::string s = "{\"op\":\"error\",\"error\":\"rag template missing\"}\n"; ::write(cfd, s.c_str(), s.size());
+                    } else {
+                        std::string folder = json_get_string(req, "folder");
+                        std::string query = json_get_string(req, "query");
+                        std::string topk = std::to_string(json_get_int(req, "topk", 5));
+                        std::map<std::string,std::string> kv {{"SUBOP", subop},{"RAG_ROOT", folder},{"QUERY", escape_quotes(query)},{"TOPK", topk}};
+                        std::string cmd = build_cmd(tmpl, kv);
+                        fs::path log = fs::path(outputs_base_from_cfg(cfg))/"rag.log";
+                        int rc = run_system_logged(cmd, log);
+                        if (rc==0) {
+                            std::string out = read_file(log);
+                            // 最後の { から JSON を推定
+                            auto p = out.rfind('{');
+                            std::string js; if (p!=std::string::npos) js = out.substr(p);
+                            if (js.empty()) js = std::string("{\"op\":\"done\",\"chunks\":[]}\n");
+                            if (js.back()!='\n') js.push_back('\n');
+                            ::write(cfd, js.c_str(), js.size());
+                        } else {
+                            std::string s = std::string("{\"op\":\"error\",\"error\":\"rag ")+subop+" failed rc="+std::to_string(rc)+"\"}\n"; ::write(cfd, s.c_str(), s.size());
+                        }
+                    }
                 } else {
                     std::string s = "{\"status\":\"error\",\"message\":\"unknown op\"}\n";
                     ::write(cfd, s.c_str(), s.size());

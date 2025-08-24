@@ -49,13 +49,19 @@ public struct LlamaCppLibEngine: LLMEngine {
         let w = LLamaCppWrapperBridge()
         let sem = DispatchSemaphore(value: 0)
         var thrown: Error? = nil
-        Task.detached {
-            do { try await w.load(modelPath: modelPath) }
-            catch { thrown = error }
+        
+        Task.detached(priority: .userInitiated) {
+            do { 
+                try await w.load(modelPath: modelPath) 
+            } catch { 
+                thrown = error 
+            }
             sem.signal()
         }
-        _ = sem.wait(timeout: .now() + 30) // 30s safety
+        
+        _ = sem.wait(timeout: .now() + 60) // 60秒のタイムアウト
         if let err = thrown { throw err }
+        
         self.wrapper = w
         log.info("lib engine loaded: \(modelPath.path, privacy: .public)")
     }
