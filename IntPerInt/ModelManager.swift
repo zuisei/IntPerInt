@@ -277,8 +277,20 @@ public class ModelManager: ObservableObject {
     func setCurrentModelForSelectedConversation(name: String) {
         guard let id = selectedConversationID,
               let idx = conversations.firstIndex(where: { $0.id == id }) else { return }
-    conversations[idx].model = name
-    // ロードは sendMessage 内で遅延実行
+        if let required = requiredMemoryGB(for: name) {
+            let totalGB = ProcessInfo.processInfo.physicalMemory / (1024 * 1024 * 1024)
+            if totalGB < UInt64(required) {
+                let msg = "メモリ不足: このモデルには \(required)GB 以上のRAMが推奨されます (現在: \(totalGB)GB)"
+                postSystemNotification(key: "insufficient_memory_\(name)", message: msg, severity: .error)
+                return
+            }
+        }
+        conversations[idx].model = name
+        // ロードは sendMessage 内で遅延実行
+    }
+
+    private func requiredMemoryGB(for fileName: String) -> Int? {
+        ModelInfo.availableModels.first(where: { $0.fileName == fileName })?.recommendedMemoryGB
     }
 
     private func syncMessagesIntoSelectedConversation() {
@@ -314,6 +326,20 @@ public class ModelManager: ObservableObject {
         
         if fileExists {
             if currentModelPath?.path != candidate.path {
+                if let required = requiredMemoryGB(for: modelName) {
+                    let totalGB = ProcessInfo.processInfo.physicalMemory / (1024 * 1024 * 1024)
+                    if totalGB < UInt64(required) {
+                        let pretty = self.prettyName(for: modelName)
+                        let msg = "メモリ不足のためモデルをロードできません: \(pretty)"
+                        logger.error("Insufficient memory for model \(modelName, privacy: .public)")
+                        await MainActor.run {
+                            self.engineStatus = .failed(message: msg)
+                            self.postSystemNotification(key: "insufficient_memory_\(modelName)", message: msg, severity: .error)
+                        }
+                        let err = NSError(domain: "ModelManager", code: 413, userInfo: [NSLocalizedDescriptionKey: msg])
+                        throw err
+                    }
+                }
                 await MainActor.run { self.engineStatus = .loading(modelName: modelName) }
                 // libエンジンのロードを非同期バックグラウンドで実行（メインスレッドをブロックしない）
                 do {
@@ -322,7 +348,7 @@ public class ModelManager: ObservableObject {
                         try lib.load(modelPath: candidate)
                         return lib
                     }.value
-                    
+
                     // メインアクターで状態更新
                     self.engine = loadedEngine
                     self.currentModelPath = candidate
