@@ -46,6 +46,18 @@ extension ContentView {
             Toggle("Token Cursor", isOn: $ui.showTokenCursor)
             Toggle("Animations", isOn: $ui.enableAnimations)
             HStack { Text("Max Width"); Slider(value: $ui.preferredMaxContentWidth, in: 640...1000); Text(Int(ui.preferredMaxContentWidth).description).font(.caption) }
+            if !modelManager.downloadProgress.isEmpty {
+                Divider().padding(.vertical, 8)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Model Downloads").font(.headline)
+                    ForEach(modelManager.downloadProgress.keys.sorted(), id: \.self) { key in
+                        VStack(alignment: .leading) {
+                            Text(key).font(.caption)
+                            ProgressView(value: modelManager.downloadProgress[key] ?? 0)
+                        }
+                    }
+                }
+            }
             Spacer()
         }
         .padding(18)

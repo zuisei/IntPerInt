@@ -83,6 +83,11 @@ public class ModelManager: ObservableObject {
 
     // Track in-flight downloads and delegates for progress/cancel
     private var downloadTasks: [String: URLSessionDownloadTask] = [:]
+    private let downloadDelegate = DownloadDelegate()
+    private lazy var downloadSession: URLSession = {
+        URLSession(configuration: .default, delegate: downloadDelegate, delegateQueue: nil)
+    }()
+    private var downloadDestinations: [String: URL] = [:]
     private var saveDebounceWorkItem: Task<Void, Never>? = nil
     // 通知の重複抑止
     private var lastNotificationTimestamps: [String: Date] = [:]
@@ -110,6 +115,24 @@ public class ModelManager: ObservableObject {
         
         // 初期化時にローカルモデルを読み込む
         loadAvailableModels()
+
+        // Configure download delegate handlers
+        downloadDelegate.progressHandler = { [weak self] id, received, expected in
+            Task { @MainActor in
+                self?.downloadReceivedBytes[id] = received
+                if expected > 0 {
+                    self?.downloadExpectedBytes[id] = expected
+                    self?.downloadProgress[id] = Double(received) / Double(expected)
+                } else {
+                    self?.downloadProgress[id] = 0
+                }
+            }
+        }
+        downloadDelegate.completionHandler = { [weak self] id, location in
+            Task { @MainActor in
+                self?.handleDownloadFinished(modelID: id, location: location)
+            }
+        }
     }
     
     // デイニシャライザーでリソース解放
@@ -150,6 +173,51 @@ public class ModelManager: ObservableObject {
         } catch {
             print("Model delete failed: \(error)")
         }
+    }
+
+    // MARK: - Model Downloads
+
+    /// Download a model concurrently using shared session.
+    /// - Parameter url: Remote URL of model file.
+    func downloadModel(url: URL) {
+        let id = url.lastPathComponent
+        guard downloadTasks[id] == nil else { return } // avoid duplicate
+
+        downloadingModels.insert(id)
+        downloadProgress[id] = 0
+
+        let task = downloadSession.downloadTask(with: url)
+        downloadDelegate.register(task: task, for: id)
+        downloadTasks[id] = task
+        downloadDestinations[id] = modelsDirectory.appendingPathComponent(id)
+        task.resume()
+    }
+
+    /// Convenience for downloading multiple models concurrently.
+    func downloadModels(urls: [URL]) {
+        for u in urls { downloadModel(url: u) }
+    }
+
+    private func handleDownloadFinished(modelID id: String, location: URL) {
+        let dest = downloadDestinations[id] ?? modelsDirectory.appendingPathComponent(id)
+        do {
+            if FileManager.default.fileExists(atPath: dest.path) {
+                try FileManager.default.removeItem(at: dest)
+            }
+            try FileManager.default.moveItem(at: location, to: dest)
+        } catch {
+            print("Model download move error: \(error)")
+        }
+
+        downloadingModels.remove(id)
+        downloadTasks.removeValue(forKey: id)
+        downloadDestinations.removeValue(forKey: id)
+        downloadExpectedBytes.removeValue(forKey: id)
+        downloadReceivedBytes.removeValue(forKey: id)
+        downloadSpeed.removeValue(forKey: id)
+        downloadProgress[id] = 1.0
+
+        refreshInstalledModels()
     }
     
     func newConversation() {
