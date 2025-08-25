@@ -64,9 +64,32 @@ public struct ModelInfo: Identifiable, Hashable {
     let name: String
     let huggingFaceRepo: String
     let fileName: String
-    
-    // モデルカタログは無効化 - 手動でGGUFファイルを配置してください
-    static let availableModels: [ModelInfo] = []
+    let quantization: String
+    let recommendedMemoryGB: Int
+
+    static let availableModels: [ModelInfo] = [
+        ModelInfo(
+            name: "GPT-OSS 20B",
+            huggingFaceRepo: "gpt-oss/gpt-oss-20b-gguf",
+            fileName: "gpt-oss-20b-q4_0.gguf",
+            quantization: "q4_0",
+            recommendedMemoryGB: 24
+        ),
+        ModelInfo(
+            name: "DeepSeek LLM 67B",
+            huggingFaceRepo: "deepseek-ai/deepseek-llm-67b-gguf",
+            fileName: "deepseek-llm-67b-q4_k_m.gguf",
+            quantization: "q4_k_m",
+            recommendedMemoryGB: 64
+        ),
+        ModelInfo(
+            name: "GPT-OSS 120B (Experimental)",
+            huggingFaceRepo: "gpt-oss/gpt-oss-120b-gguf",
+            fileName: "gpt-oss-120b-q4_k_s.gguf",
+            quantization: "q4_k_s",
+            recommendedMemoryGB: 128
+        )
+    ]
 }
 // ※ 下部に重複/未完了だった ChatMessage 宣言を削除済み
 // (EOF)
