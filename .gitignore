@@ -1,0 +1,13 @@
+# local models
+Models/*.gguf
+
+# Xcode / Swift artifacts
+build/
+.build/
+DerivedData/
+*.pcm
+*.pch
+*.swiftdeps
+*.swiftmodule
+*.dylib
+*.db
