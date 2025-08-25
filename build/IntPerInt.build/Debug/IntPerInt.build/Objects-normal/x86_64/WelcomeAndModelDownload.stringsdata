@@ -1,0 +1,88 @@
+{
+  "source": "/Users/0xt4/Projects/IntPerInt/IntPerInt/Views/WelcomeAndModelDownload.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Welcome to IntPerInt",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 17
+        }
+      },
+      {
+        "comment": "",
+        "key": "ローカル LLM とクラウドを統合した、あなたの macOS アシスタント",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 19
+        }
+      },
+      {
+        "comment": "",
+        "key": "今すぐ開始",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 27
+        }
+      },
+      {
+        "comment": "",
+        "key": "既にローカルモデルをお持ちの場合は、すぐにチャットを始められます。",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 29
+        }
+      },
+      {
+        "comment": "",
+        "key": "開始",
+        "location": {
+          "startingColumn": 63,
+          "startingLine": 41
+        }
+      },
+      {
+        "comment": "",
+        "key": "ローカルモデルが必要です",
+        "location": {
+          "startingColumn": 74,
+          "startingLine": 41
+        }
+      },
+      {
+        "comment": "",
+        "key": "今すぐ開始",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 36
+        }
+      },
+      {
+        "comment": "",
+        "key": "モデルを入手",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 50
+        }
+      },
+      {
+        "comment": "",
+        "key": "GGUFファイルを手動でモデルフォルダに配置してください。フォルダを開いて直接ファイルをコピーできます。",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 52
+        }
+      },
+      {
+        "comment": "",
+        "key": "モデルフォルダを開く",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 58
+        }
+      }
+    ]
+  },
+  "version": 1
+}

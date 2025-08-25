@@ -101,6 +101,7 @@
 			buildPhases = (
 				BB35A8972E51927F0045600E /* Sources */,
 				BB35A8982E51927F0045600E /* Frameworks */,
+				BB9999002F00000000000001 /* ShellScript */,
 				BB35A8992E51927F0045600E /* Resources */,
 			);
 			buildRules = (
@@ -214,6 +215,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		BB9999002F00000000000001 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/runtime/.bundled-llama.stamp",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "set -euo pipefail\nRUNTIME_DIR=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/runtime\"\nBIN_DIR=\"$RUNTIME_DIR/bin\"\nSHARE_DIR=\"$RUNTIME_DIR/share/llama.cpp\"\nLIB_DIR=\"$RUNTIME_DIR/lib\"\nSTAMP=\"${SCRIPT_OUTPUT_FILE_0:-$RUNTIME_DIR/.bundled-llama.stamp}\"\nmkdir -p \"$BIN_DIR\" \"$SHARE_DIR\" \"$LIB_DIR\"\n# pick executable\nEXEC_SRC=\"\"\nfor p in \\\n  /opt/homebrew/opt/llama.cpp/bin/llama-cli \\\n  /opt/homebrew/opt/llama.cpp/bin/llama \\\n  /usr/local/opt/llama.cpp/bin/llama-cli \\\n  /usr/local/opt/llama.cpp/bin/llama; do\n  if [ -x \"$p\" ]; then EXEC_SRC=\"$p\"; break; fi\ndone\nif [ -z \"$EXEC_SRC\" ]; then WH=\"$(/usr/bin/which llama-cli 2>/dev/null || true)\"; [ -n \"$WH\" ] && EXEC_SRC=\"$WH\"; fi\nif [ -z \"$EXEC_SRC\" ]; then WH=\"$(/usr/bin/which llama 2>/dev/null || true)\"; [ -n \"$WH\" ] && EXEC_SRC=\"$WH\"; fi\nif [ -n \"$EXEC_SRC\" ]; then\n  BASENAME=\"$(basename \"$EXEC_SRC\")\"\n  # dereference symlinks when copying into app bundle\n  rsync -aL \"$EXEC_SRC\" \"$BIN_DIR/$BASENAME\" || true\n  chmod 755 \"$BIN_DIR/$BASENAME\" || true\nfi\n# metallib: try exec-local and common locations\nCANDS=()\nif [ -n \"$EXEC_SRC\" ]; then\n  EXECDIR=\"$(dirname \"$EXEC_SRC\")\"\n  PREFIX=\"$(dirname \"$EXECDIR\")\"\n  CANDS+=(\"$EXECDIR/default.metallib\")\n  CANDS+=(\"$PREFIX/share/llama.cpp/default.metallib\")\nfi\nCANDS+=(\"/opt/homebrew/opt/llama.cpp/share/llama.cpp/default.metallib\")\nCANDS+=(\"/usr/local/opt/llama.cpp/share/llama.cpp/default.metallib\")\nfor m in /opt/homebrew/Cellar/llama.cpp/*/share/llama.cpp/default.metallib /usr/local/Cellar/llama.cpp/*/share/llama.cpp/default.metallib; do\n  [ -e \"$m\" ] && CANDS+=(\"$m\") || true\ndone\nfor m in \"${CANDS[@]}\"; do\n  if [ -f \"$m\" ]; then rsync -aL \"$m\" \"$SHARE_DIR/default.metallib\" || true; break; fi\ndone\n# copy libllama.dylib if present to runtime/lib\nfor L in \\\n  /opt/homebrew/opt/llama.cpp/lib/libllama.dylib \\\n  /usr/local/opt/llama.cpp/lib/libllama.dylib; do\n  if [ -f \"$L\" ]; then rsync -aL \"$L\" \"$LIB_DIR/libllama.dylib\" || true; chmod 755 \"$LIB_DIR/libllama.dylib\" || true; break; fi\ndone\n# copy libggml*.dylib into runtime/lib\nGGML_DIRS=()\nif [ -n \"$EXEC_SRC\" ]; then\n  EXECDIR=\"$(dirname \"$EXEC_SRC\")\"\n  PREFIX=\"$(dirname \"$EXECDIR\")\"\n  GGML_DIRS+=(\"$PREFIX/lib\")\nfi\nGGML_DIRS+=(\"/opt/homebrew/opt/llama.cpp/lib\")\nGGML_DIRS+=(\"/usr/local/opt/llama.cpp/lib\")\nfor d in \"${GGML_DIRS[@]}\"; do\n  if [ -d \"$d\" ]; then\n    for f in \"$d\"/libggml*.dylib; do\n      [ -f \"$f\" ] || continue\n      base=\"$(basename \"$f\")\"\n      rsync -aL \"$f\" \"$LIB_DIR/$base\" || true\n      chmod 755 \"$LIB_DIR/$base\" || true\n    done\n  fi\ndone\n\n# fix rpath so bundled exec can find libs without DYLD_LIBRARY_PATH\nfor exe in \"$BIN_DIR/llama-cli\" \"$BIN_DIR/llama\"; do\n  if [ -x \"$exe\" ]; then\n    /usr/bin/install_name_tool -add_rpath \"@executable_path/../lib\" \"$exe\" 2>/dev/null || true\n  fi\ndone\n\n# codesign bundled binaries to prevent sandbox kill\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ] && [ \"$EXPANDED_CODE_SIGN_IDENTITY\" != \"-\" ]; then\n  for exe in \"$BIN_DIR/llama-cli\" \"$BIN_DIR/llama\"; do\n    if [ -x \"$exe\" ]; then\n      /usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --options runtime --timestamp=none \"$exe\" 2>/dev/null || true\n    fi\n  done\n  for dylib in \"$LIB_DIR\"/*.dylib; do\n    [ -f \"$dylib\" ] || continue\n    /usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --options runtime --timestamp=none \"$dylib\" 2>/dev/null || true\n  done\nfi\n\n# stamp\nmkdir -p \"$(dirname \"$STAMP\")\"\n: > \"$STAMP\"\nexit 0\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		BB35A8972E51927F0045600E /* Sources */ = {
@@ -382,6 +404,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"IntPerInt/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = IntPerInt;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
@@ -411,6 +434,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"IntPerInt/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = IntPerInt;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
@@ -496,16 +520,16 @@
 		BBEFE0F12E51F4FB00081BA4 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
 				COPY_PHASE_STRIP = NO;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_OPTIMIZATION_LEVEL = 0;
-				PRODUCT_NAME = IntPerIntUITests;
 				GENERATE_INFOPLIST_FILE = YES;
-				SWIFT_VERSION = 5.0;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.IntPerIntUITests;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				CODE_SIGNING_ALLOWED = NO;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.IntPerIntUITests;
+				PRODUCT_NAME = IntPerIntUITests;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};

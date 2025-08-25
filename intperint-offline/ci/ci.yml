@@ -1,0 +1,28 @@
+name: Offline CI (template)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install from local wheels (example)
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --no-index --find-links=./wheels -r requirements.txt || true
+      - name: Run pytest (offline)
+        env:
+          HF_HUB_OFFLINE: '1'
+          TRANSFORMERS_OFFLINE: '1'
+          DIFFUSERS_OFFLINE: '1'
+          HF_DATASETS_OFFLINE: '1'
+        run: |
+          source .venv/bin/activate
+          pytest -q

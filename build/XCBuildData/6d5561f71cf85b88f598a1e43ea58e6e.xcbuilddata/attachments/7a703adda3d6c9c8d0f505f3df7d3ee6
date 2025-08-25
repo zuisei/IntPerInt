@@ -1,0 +1,17 @@
+/Users/0xt4/Projects/IntPerInt/IntPerInt/Views/DiagnosticsView.swift
+/Users/0xt4/Projects/IntPerInt/IntPerInt/Utils/LlamaCLIResolver.swift
+/Users/0xt4/Projects/IntPerInt/IntPerInt/ContentView.swift
+/Users/0xt4/Projects/IntPerInt/IntPerInt/Runtime/RuntimeManager.swift
+/Users/0xt4/Projects/IntPerInt/IntPerInt/ModelManager.swift
+/Users/0xt4/Projects/IntPerInt/IntPerInt/Models.swift
+/Users/0xt4/Projects/IntPerInt/IntPerInt/Engines/LlamaCppLibEngine.swift
+/Users/0xt4/Projects/IntPerInt/IntPerInt/Views/WelcomeAndModelDownload.swift
+/Users/0xt4/Projects/IntPerInt/IntPerInt/Engines/LlamaCppEngine.swift
+/Users/0xt4/Projects/IntPerInt/IntPerInt/IntPerIntApp.swift
+/Users/0xt4/Projects/IntPerInt/IntPerInt/Utils/ModelValidator.swift
+/Users/0xt4/Projects/IntPerInt/IntPerInt/Shared/RuntimeEnv.swift
+/Users/0xt4/Projects/IntPerInt/IntPerInt/Storage/ConversationStore.swift
+/Users/0xt4/Projects/IntPerInt/IntPerInt/Engines/LLMEngine.swift
+/Users/0xt4/Projects/IntPerInt/IntPerInt/Models/InstalledModel.swift
+/Users/0xt4/Projects/IntPerInt/IntPerInt/Services/DownloadDelegate.swift
+/Users/0xt4/Projects/IntPerInt/build/IntPerInt.build/Debug/IntPerInt.build/DerivedSources/GeneratedAssetSymbols.swift

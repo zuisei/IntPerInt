@@ -1,167 +1,57 @@
-# IntPerInt - Local AI Assistant
+完成しておりません。ご勘弁を
+ーーーーーー実装されてる機能一覧ーーーーーー
 
-SwiftUI製のmacOSアプリケーションで、ローカルLLM推論とクラウドAI APIを統合したインテリジェントなアシスタントです。
 
-## 機能
 
-### 🚀 AI プロバイダー
-- **LLaMA.cpp** - ローカルでGGUFモデルを実行
-- **OpenAI GPT** - クラウドベースのGPT API統合
+## アプリ（SwiftUI/macOS）
 
-### 🔄 モデル管理
-- GGUF形式モデルの自動ダウンロード
-- HuggingFace リポジトリからの直接インポート
-- 推奨モデル（Llama 2, CodeLlama, Mistral）
-- カスタムモデルURL対応
+- 会話UIと設定画面、モデル管理ガイド
+  - ローカルGGUFの手動配置を前提（分割GGUF *.gguf.partN 検出と案内）
+  - 以前の「アプリ内モデルダウンロードUI」は撤去
+- 会話の永続化
+  - `ConversationStore` による保存/復元
+- エンジン切替
+  - ローカル組み込み: llama.cpp ライブラリ（ObjCブリッジ `LLamaCppWrapper.h/.mm`、`LlamaCppLibEngine`）
+  - 外部ストリーミング: UDSヘルパー経由（トグルで選択）
+- 生成体験
+  - トークン逐次ストリーミング表示（UIデバウンスで負荷軽減）
+  - 生成キャンセル操作に対応
+- OpenAI API統合（基盤）
+  - プロバイダ切替の土台あり（完全オフライン運用時は未使用）
 
-### ⚙️ 設定
-- Temperature, Max Tokens, Top-p調整
-- カスタムシステムプロンプト
-- プロバイダー別設定管理
+## UDSヘルパー（C++ / Unix Domain Socket）
 
-### 🎯 将来の機能
-- OpenCVによるマルチモーダル処理
-- 画像・動画解析機能
-- FFmpeg統合
+- ソケット/プロトコル
+  - intperint.sock で JSON Lines 通信（1行1 JSON）
+- LLMストリーミング
+  - `start_chat` で外部コマンド起動→`{"op":"token"}` を逐次送出→`{"op":"done"}` まで
+  - `cancel` で実行中プロセスをPID管理して停止可能
+- 画像/動画生成
+  - `generate_image`: Diffusers(MPS) または stable-diffusion.cpp コマンドテンプレ対応
+  - `submit_video`: AnimateDiffベースの簡易動画（img2imgフレーム→ffmpeg結合）
+  - `job_status`: 進捗/結果参照
+- 出力/ログ
+  - `~/Library/Application Support/IntPerInt/outputs/<jobid>/` に画像/動画/ログ/メタ出力
+- 設定（`config.json`）
+  - `command_templates` と `workdir_base`、モデル/バイナリのパス解決（テンプレ/フォールバック）
+  - llama.cpp/SD/AnimateDiff 用テンプレに差し替え可能
 
-## 前提条件
+## スクリプト/サービス層
 
-### macOS要件
-- macOS 13.0以降
-- Xcode 15.0以降（開発する場合）
+- 画像/動画スクリプト
+  - `run_sd_diffusers.py`（Diffusers + MPS）
+  - `animate_diff_run.py`（フレーム生成→ffmpeg）
+- UDSクライアント（アプリ側）
+  - `Services/UDSClient.swift` に統合（単発送信・ストリーム受信）
+- 動作確認
+  - uds_chat_test.py（ストリーミング検証用）
 
-### LLaMA.cpp（ローカル推論用）
-```bash
-# Homebrewでインストール
-brew install llama.cpp
-```
+## テスト/ビルド
 
-### Swift Package Manager
-プロジェクトはSwift Package Managerを使用しています。
+- アプリ側テスト
+  - IntPerIntTests（永続化/ストリーミングの基本テスト）
+- ヘルパービルド
+  - CMake + Clang（Apple Silicon）、起動ログ `helper_run.log` 出力
 
-## インストール・実行
-
-### 1. リポジトリをクローン
-```bash
-git clone <repository-url>
-cd IntPerInt
-```
-
-### 2. ビルドと実行
-```bash
-# ビルド
-swift build
-
-# 実行
-swift run
-```
-
-### 3. 開発用にXcodeで開く
-```bash
-swift package generate-xcodeproj
-open IntPerInt.xcodeproj
-```
-
-## 使用方法
-
-### 初回起動
-1. アプリを起動
-2. サイドバーから「GGUFモデル管理」を選択
-3. 推奨モデルから選択してダウンロード
-4. チャット画面でプロバイダーを「LLaMA.cpp (ローカル)」に設定
-
-### OpenAI API使用
-1. 設定画面でAPI Keyを入力
-2. プロバイダーを「OpenAI GPT」に切り替え
-
-### モデルのカスタマイズ
-1. 設定画面でTemperature, Max Tokens, Top-pを調整
-2. システムプロンプトをカスタマイズ
-
-## プロジェクト構造
-
-```
-IntPerInt/
-├── Sources/IntPerInt/
-│   ├── App.swift              # メインアプリ構造
-│   ├── ContentView.swift      # メインUI
-│   ├── Models.swift           # データモデル定義
-│   ├── Views.swift            # UI コンポーネント
-│   └── Managers.swift         # AI処理管理
-├── Tests/IntPerIntTests/
-│   └── IntPerIntTests.swift   # テストケース
-├── Package.swift              # Swift Package設定
-└── README.md                  # このファイル
-```
-
-## 技術スタック
-
-- **SwiftUI** - ユーザーインターフェース
-- **Combine** - 非同期処理・リアクティブプログラミング
-- **LLaMA.cpp** - ローカルLLM推論エンジン
-- **URLSession** - ネットワーク通信・ファイルダウンロード
-- **FileManager** - ローカルファイル管理
-
-## 開発
-
-### デバッグビルド
-```bash
-swift build -c debug
-```
-
-### リリースビルド
-```bash
-swift build -c release
-```
-
-### テスト実行
-```bash
-swift test
-```
-
-### Xcodeプロジェクト生成
-```bash
-swift package generate-xcodeproj
-```
-
-## トラブルシューティング
-
-### LLaMA.cppライブラリが見つからない場合
-```bash
-# Homebrewでインストール
-brew install llama.cpp
-
-# パスを確認
-brew --prefix llama.cpp
-```
-
-### モデルダウンロードの問題
-- インターネット接続を確認
-- 十分なディスク容量があることを確認
-- HuggingFaceのモデルURLが正しいことを確認
-
-### ビルドエラーの場合
-```bash
-# キャッシュをクリア
-swift package clean
-
-# 依存関係をリセット
-swift package reset
-```
-
-## ライセンス
-
-MIT License
-
-## 貢献
-
-プルリクエストやIssueを歓迎します。
-
-## 更新履歴
-
-### v1.0.0 (初回リリース)
-- SwiftUI基本UI実装
-- LLaMA.cpp統合準備
-- OpenAI API統合準備
-- GGUF モデル自動ダウンロード機能
-- 基本設定画面実装
+補足
+- 現状は「ローカルGGUFの手動配置 + UDSストリーミング or ライブラリ直実行」の二本立て。UDS経由はトークンストリームとキャンセルが安定動作。OpenAIは基盤のみ有効。

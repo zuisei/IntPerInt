@@ -1,13 +1,26 @@
 import Foundation
 
 // MARK: - Core Models
-struct ChatMessage: Identifiable, Codable {
-    let id: UUID
-    var content: String
-    let isUser: Bool
-    let timestamp: Date
 
-    init(id: UUID = UUID(), content: String, isUser: Bool, timestamp: Date = Date()) {
+public struct GenerationParams: Codable, Hashable, Sendable {
+    public var temperature: Double
+    public var topP: Double
+    public var maxTokens: Int
+    public var seed: Int?
+    public var stop: [String]?
+    public init(temperature: Double = 0.7, topP: Double = 1.0, maxTokens: Int = 512, seed: Int? = nil, stop: [String]? = nil) {
+        self.temperature = temperature; self.topP = topP; self.maxTokens = maxTokens
+        self.seed = seed; self.stop = stop
+    }
+}
+
+public struct ChatMessage: Identifiable, Codable, Hashable {
+    public let id: UUID
+    public var content: String
+    public let isUser: Bool
+    public let timestamp: Date
+
+    public init(id: UUID = UUID(), content: String, isUser: Bool, timestamp: Date = Date()) {
         self.id = id
         self.content = content
         self.isUser = isUser
@@ -15,31 +28,27 @@ struct ChatMessage: Identifiable, Codable {
     }
 }
 
-struct Conversation: Identifiable, Codable {
-    let id: UUID
-    var title: String
-    var messages: [ChatMessage]
-    var updatedAt: Date
-    var modelName: String?
+public struct Conversation: Codable, Identifiable, Hashable {
+    public var id: UUID
+    public var title: String
+    public var messages: [ChatMessage]
+    public var createdAt: Date
+    public var updatedAt: Date
+    public var model: String?
+    public var generationParams: GenerationParams
 
-    init(id: UUID = UUID(), title: String = "New Chat", messages: [ChatMessage] = [], updatedAt: Date = Date(), modelName: String? = nil) {
+    public init(id: UUID = UUID(), title: String = "", messages: [ChatMessage] = [], createdAt: Date = Date(), updatedAt: Date? = nil, model: String? = nil, generationParams: GenerationParams = GenerationParams()) {
         self.id = id
         self.title = title
         self.messages = messages
-        self.updatedAt = updatedAt
-        self.modelName = modelName
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt ?? createdAt
+        self.model = model
+        self.generationParams = generationParams
     }
 }
 
-extension Conversation: Equatable {
-    static func == (lhs: Conversation, rhs: Conversation) -> Bool { lhs.id == rhs.id }
-}
-
-extension Conversation: Hashable {
-    func hash(into hasher: inout Hasher) { hasher.combine(id) }
-}
-
-enum AIProvider: String, CaseIterable {
+public enum AIProvider: String, CaseIterable {
     case llamaCpp = "llama_cpp"
     
     var displayName: String {
@@ -50,15 +59,16 @@ enum AIProvider: String, CaseIterable {
     }
 }
 
-struct ModelInfo: Identifiable, Hashable {
-    var id: String { fileName }
+public struct ModelInfo: Identifiable, Hashable {
+    public var id: String { fileName }
     let name: String
     let huggingFaceRepo: String
     let fileName: String
     
-    static let availableModels = [
-        ModelInfo(name: "Llama-2-7b-Chat", huggingFaceRepo: "TheBloke/Llama-2-7B-Chat-GGML", fileName: "llama-2-7b-chat.q4_0.gguf"),
-        ModelInfo(name: "CodeLlama-7b-Instruct", huggingFaceRepo: "TheBloke/CodeLlama-7B-Instruct-GGML", fileName: "codellama-7b-instruct.q4_0.gguf"),
-        ModelInfo(name: "Mistral-7b-Instruct", huggingFaceRepo: "TheBloke/Mistral-7B-Instruct-v0.1-GGML", fileName: "mistral-7b-instruct-v0.1.q4_0.gguf")
-    ]
+    // モデルカタログは無効化 - 手動でGGUFファイルを配置してください
+    static let availableModels: [ModelInfo] = []
 }
+// ※ 下部に重複/未完了だった ChatMessage 宣言を削除済み
+// (EOF)
+
+

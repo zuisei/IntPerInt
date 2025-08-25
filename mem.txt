@@ -1,0 +1,25 @@
+優先順で上から。括弧内は用途。ダウンロード先はリンク（クリックで開く）。
+
+	1.	⭐ SDXL base (stabilityai/stable-diffusion-xl-base-1.0) — 高画質静止画の基盤（必須）。  ￼
+https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0
+	2.	⭐ SDXL refiner (stabilityai/stable-diffusion-xl-refiner-1.0) — 出力の細部を上げるリファイナ（推奨）。  ￼
+https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0
+	3.	⭐ SDXL VAE / FP16-fix（SDXL VAE） — SDXL 実行で必要になる場合あり（環境依存）。  ￼
+https://huggingface.co/stabilityai/sdxl-vae
+（FP16 VAE fix 例）https://huggingface.co/madebyollin/sdxl-vae-fp16-fix
+	4.	⭐ stable-diffusion.cpp（C++ 実装・Apple Silicon 対応を優先） — C++/ggml ベースでローカル高速実行するならコレ。  ￼
+https://github.com/leejet/stable-diffusion.cpp
+	5.	⭐ AnimateDiff（公式実装 — テキスト→動画モジュール） — 静止画→動画化に使う標準モジュール（AnimateDiff）。  ￼
+https://github.com/guoyww/AnimateDiff
+（公式ページ）https://animatediff.github.io/  ￼
+	6.	⭐ AnimateDiff 用 Motion-LoRA（複数） — 動きパターン（パン、ズーム等）。いくつか落としておくと便利。例：guoyww/animatediff-motion-lora-*。  ￼
+https://huggingface.co/guoyww/animatediff-motion-lora-v1-5-3
+コレクション例: https://huggingface.co/collections/dn6/animatediff-motion-loras-654cb8ad7329e…  ￼
+	7.	⭐ RIFE（フレーム補間） — フレーム補間（滑らか化）で推奨。実装・weights は複数。  ￼
+https://github.com/hzwer/ECCV2022-RIFE
+https://github.com/hzwer/Practical-RIFE
+	8.	⭐ llama.cpp（GGUF対応、ローカルLLM実行） — LLMをローカルで動かすための標準実装。必ず確認。  ￼
+https://github.com/ggerganov/llama.cpp
+	9.	⭐ all-MiniLM-L6-v2（埋め込み / RAG用） — 軽量で高速、RAG（DeepSearch）に最適。  ￼
+https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
+	10.	◯ BLIP-2（画像→テキスト / VQA 用） — 画像理解（キャプション / VQA）に使う。まずは BLIP-2 を。  

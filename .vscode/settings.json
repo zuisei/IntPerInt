@@ -1,0 +1,8 @@
+{
+    "cmake.ignoreCMakeListsMissing": true,
+    "files.associations": {
+        "ios": "cpp",
+        "queue": "cpp",
+        "stack": "cpp"
+    }
+}

@@ -1,0 +1,28 @@
+# local models
+Models/*.gguf
+
+# Xcode / Swift artifacts
+build/
+.build/
+DerivedData/
+*.pcm
+*.pch
+*.swiftdeps
+*.swiftmodule
+*.dylib
+*.db
+# macOS
+.DS_Store
+
+# build artifacts
+build/
+.build/
+DerivedData/
+*.pcm
+*.o
+*.db
+*.pch
+*.swiftdeps
+*.idx
+*.dylib
+IntPerInt.app/
