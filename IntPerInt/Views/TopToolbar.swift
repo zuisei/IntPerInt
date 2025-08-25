@@ -16,32 +16,63 @@ struct TopToolbar: View {
             .buttonStyle(.plain)
             .help("Toggle Sidebar")
 
-            // Provider picker
-            Picker("Provider", selection: $selectedProvider) {
-                ForEach(AIProvider.allCases, id: \.self) { p in
-                    Text(p.displayName).tag(p)
+            // Use-case selector
+            Picker("Mode", selection: $modelManager.selectedUseCase) {
+                ForEach(ModelUseCase.allCases, id: \.self) { c in
+                    Text(c.displayName).tag(c)
                 }
             }
-            .pickerStyle(.menu)
-            .frame(width: 130)
+            .pickerStyle(.segmented)
+            .frame(width: 250)
 
-            // Model picker
-            Picker("Model", selection: Binding(
-                get: { currentConversationModel ?? "__none__" },
-                set: { name in setCurrentModel(name == "__none__" ? "" : name) }
-            )) {
-                Text("Select Model…").tag("__none__")
-                if modelManager.validInstalledModels.isEmpty {
-                    Text("(No Valid Models)").tag("__no_models__").disabled(true)
-                } else {
-                    ForEach(modelManager.validInstalledModels, id: \.fileName) { m in
-                        Text(prettyModelName(m.fileName)).tag(m.fileName)
+            // Provider picker (only relevant for chat)
+            if modelManager.selectedUseCase == .chat {
+                Picker("Provider", selection: $selectedProvider) {
+                    ForEach(AIProvider.allCases, id: \.self) { p in
+                        Text(p.displayName).tag(p)
                     }
                 }
+                .pickerStyle(.menu)
+                .frame(width: 130)
             }
-            .pickerStyle(.menu)
-            .frame(width: 170)
-            .help("Select Model")
+
+            // Model picker depending on use-case
+            if modelManager.selectedUseCase == .chat {
+                Picker("Model", selection: Binding(
+                    get: { currentConversationModel ?? "__none__" },
+                    set: { name in setCurrentModel(name == "__none__" ? "" : name) }
+                )) {
+                    Text("Select Model…").tag("__none__")
+                    if modelManager.validInstalledModels.isEmpty {
+                        Text("(No Valid Models)").tag("__no_models__").disabled(true)
+                    } else {
+                        ForEach(modelManager.validInstalledModels, id: \.fileName) { m in
+                            Text(prettyModelName(m.fileName)).tag(m.fileName)
+                        }
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 170)
+                .help("Select Model")
+            } else if modelManager.selectedUseCase == .imageUnderstanding {
+                Picker("VQA Model", selection: $modelManager.selectedVQAModel) {
+                    ForEach(ModelCatalog.vqaModels, id: \.id) { m in
+                        Text(m.name).tag(m.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 170)
+                .help("Select VQA Model")
+            } else {
+                Picker("Image Model", selection: $modelManager.selectedImageModel) {
+                    ForEach(ModelCatalog.imageModels, id: \.id) { m in
+                        Text(m.name).tag(m.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 170)
+                .help("Select Image Model")
+            }
 
             // Status chip
             statusChip

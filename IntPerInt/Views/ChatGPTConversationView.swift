@@ -1,5 +1,6 @@
 import SwiftUI
 import Foundation
+import AppKit
 
 // ChatEmptyState now lives in ChatEmptyState.swift (same module)
 
@@ -69,24 +70,33 @@ struct ChatGPTConversationView: View {
 
     private func sendMessage() {
         guard !messageInput.isEmpty else { return }
-        let params = GenerationParams(
-            temperature: temperature,
-            topP: topP,
-            maxTokens: Int(maxTokens),
-            seed: seedText.isEmpty ? nil : Int(seedText),
-            stop: stopWords.split(separator: ",").map(String.init)
-        )
-        // モデル自動補完: 会話に未設定なら最初の validInstalledModels を設定
-        var activeModel = currentConversationModel()
-        if activeModel == nil || activeModel == "" {
-            if let first = modelManager.validInstalledModels.first?.fileName {
-                modelManager.setCurrentModelForSelectedConversation(name: first)
-                activeModel = first
+        switch modelManager.selectedUseCase {
+        case .chat:
+            let params = GenerationParams(
+                temperature: temperature,
+                topP: topP,
+                maxTokens: Int(maxTokens),
+                seed: seedText.isEmpty ? nil : Int(seedText),
+                stop: stopWords.split(separator: ",").map(String.init)
+            )
+            // モデル自動補完: 会話に未設定なら最初の validInstalledModels を設定
+            var activeModel = currentConversationModel()
+            if activeModel == nil || activeModel == "" {
+                if let first = modelManager.validInstalledModels.first?.fileName {
+                    modelManager.setCurrentModelForSelectedConversation(name: first)
+                    activeModel = first
+                }
             }
+            let active = activeModel ?? ""
+            modelManager.sendMessage(messageInput, using: active, provider: selectedProvider, params: params)
+        case .imageUnderstanding:
+            let model = modelManager.selectedVQAModel
+            Task { _ = await modelManager.runVQA(question: messageInput, image: NSImage(), modelName: model) }
+        case .imageGeneration:
+            let model = modelManager.selectedImageModel
+            Task { _ = await modelManager.generateImage(prompt: messageInput, modelName: model) }
         }
-        let active = activeModel ?? ""
-        modelManager.sendMessage(messageInput, using: active, provider: selectedProvider, params: params)
-        messageInput = "" // 送信後クリア
+        messageInput = ""
     }
 
     private func cancelGeneration() { modelManager.cancelGeneration() }
