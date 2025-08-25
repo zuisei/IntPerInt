@@ -3,6 +3,23 @@ import Combine
 import os
 import AppKit
 
+// 利用目的の分類
+public enum ModelUseCase: String, CaseIterable, Identifiable {
+    case chat
+    case imageUnderstanding
+    case imageGeneration
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .chat: return "チャット"
+        case .imageUnderstanding: return "画像理解"
+        case .imageGeneration: return "画像生成"
+        }
+    }
+}
+
 // インストール済みモデルの情報
 public struct InstalledModel: Identifiable, Hashable {
     public let id = UUID()
@@ -38,6 +55,11 @@ public class ModelManager: ObservableObject {
     @Published var systemNotifications: [SystemNotification] = []
     // エンジン状態（送信直前のプリロードの可視化）
     @Published var engineStatus: EngineStatus = .idle
+
+    // 利用目的と各用途のモデル選択
+    @Published var selectedUseCase: ModelUseCase = .chat
+    @Published var selectedVQAModel: String = ModelCatalog.vqaModels.first?.id ?? ""
+    @Published var selectedImageModel: String = ModelCatalog.imageModels.first?.id ?? ""
 
     // Engine and task management
     private var engine: LLMEngine = {
@@ -235,6 +257,20 @@ public class ModelManager: ObservableObject {
     logger.info("generation cancelled by user")
         currentGenerationTask = nil
         Task { @MainActor in self.isGenerating = false }
+    }
+
+    // MARK: - VQA & Image Generation handlers
+
+    func runVQA(question: String, image: NSImage, modelName: String) async -> String {
+        logger.info("VQA request using \(modelName, privacy: .public)")
+        // Placeholder implementation
+        return ""
+    }
+
+    func generateImage(prompt: String, modelName: String) async -> NSImage? {
+        logger.info("Image generation request using \(modelName, privacy: .public)")
+        // Placeholder implementation
+        return nil
     }
 
 
