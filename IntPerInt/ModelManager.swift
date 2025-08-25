@@ -64,15 +64,20 @@ public class ModelManager: ObservableObject {
     private var saveDebounceWorkItem: Task<Void, Never>? = nil
     // 通知の重複抑止
     private var lastNotificationTimestamps: [String: Date] = [:]
-    
+
     // ファイルシステム監視用
     private var fileSystemMonitor: DispatchSourceFileSystemObject? = nil
+
+    // Video module loader
+    private let videoModelLoader: VideoModelLoader
 
     init() {
         // ユーザーのDocumentsディレクトリ内にModelsフォルダを作成
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         modelsDirectory = documentsPath.appendingPathComponent("IntPerInt/Models")
         try? FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
+
+        videoModelLoader = VideoModelLoader(modelsDirectory: modelsDirectory)
 
     // CLIの自動検出は廃止（libエンジンを優先使用）
 
@@ -481,6 +486,11 @@ extension ModelManager {
 
         // インストール済みから有効モデルを検証・抽出
         validateInstalledModels()
+
+        // Load video-related modules into their engines
+        Task {
+            await videoModelLoader.loadAll()
+        }
     }
 
     private func prettyName(for fileName: String) -> String {

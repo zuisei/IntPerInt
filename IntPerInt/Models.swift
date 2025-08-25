@@ -14,6 +14,19 @@ public struct GenerationParams: Codable, Hashable, Sendable {
     }
 }
 
+/// Parameters for video generation engines such as AnimateDiff.
+public struct VideoGenerationParams: Codable, Hashable, Sendable {
+    /// Number of frames to generate for a clip.
+    public var frames: Int
+    /// Whether to enable Motion LoRA modules when available.
+    public var useMotionLoRA: Bool
+
+    public init(frames: Int = 24, useMotionLoRA: Bool = true) {
+        self.frames = frames
+        self.useMotionLoRA = useMotionLoRA
+    }
+}
+
 public struct ChatMessage: Identifiable, Codable, Hashable {
     public let id: UUID
     public var content: String
