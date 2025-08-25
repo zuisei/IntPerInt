@@ -7,6 +7,8 @@ struct RightSidebar: View {
     @Binding var maxTokens: Double
     @Binding var seedText: String
     @Binding var stopWords: String
+    @Binding var frameCount: Double
+    @Binding var useMotionLoRA: Bool
     @AppStorage("allowNSFW") private var allowNSFW: Bool = false
     
     var body: some View {
@@ -66,7 +68,7 @@ struct RightSidebar: View {
                     }
                     
                     Divider()
-                    
+
                     // Quick Presets
                     ParameterPresets(
                         temperature: $temperature,
@@ -80,6 +82,28 @@ struct RightSidebar: View {
                             Text("Allow NSFW")
                                 .font(.caption.weight(.medium))
                             Text("When enabled, filtering is relaxed for image/video generation.")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .toggleStyle(.switch)
+
+                    Divider()
+
+                    // Video generation parameters
+                    ParameterSlider(
+                        title: "Frames",
+                        value: $frameCount,
+                        range: 1...120,
+                        step: 1,
+                        description: "Number of frames"
+                    )
+
+                    Toggle(isOn: $useMotionLoRA) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Use Motion LoRA")
+                                .font(.caption.weight(.medium))
+                            Text("Enable AnimateDiff Motion LoRA modules")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
