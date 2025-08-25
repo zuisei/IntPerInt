@@ -11,3 +11,18 @@ DerivedData/
 *.swiftmodule
 *.dylib
 *.db
+# macOS
+.DS_Store
+
+# build artifacts
+build/
+.build/
+DerivedData/
+*.pcm
+*.o
+*.db
+*.pch
+*.swiftdeps
+*.idx
+*.dylib
+IntPerInt.app/
