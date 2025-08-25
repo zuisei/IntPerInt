@@ -156,13 +156,15 @@ struct LeftSidebar: View {
 
     // MARK: - Conversation Cell
     private func cell(for c: Conversation) -> some View {
-        ConversationCell(
+        let info = c.model.flatMap { name in modelManager.installedModels.first(where: { $0.fileName == name }) }
+        return ConversationCell(
             conversation: c,
             isSelected: c.id == modelManager.selectedConversationID,
             hovered: hoverID == c.id,
             isRenaming: renamingID == c.id,
             draftTitle: renamingID == c.id ? $draftTitle : .constant(""),
             searchTerm: search,
+            modelInfo: info,
             onCommitRename: { title in commitRename(c, title: title) },
             onDelete: { delete(c) },
             onSelect: { select(c) },
@@ -193,6 +195,7 @@ private struct ConversationCell: View {
     let isRenaming: Bool
     @Binding var draftTitle: String
     let searchTerm: String
+    let modelInfo: InstalledModel?
     let onCommitRename: (String)->Void
     let onDelete: ()->Void
     let onSelect: ()->Void
@@ -220,7 +223,7 @@ private struct ConversationCell: View {
                 Spacer(minLength: 4)
                 if hovered && !isRenaming {
                     HStack(spacing: 6) {
-                        if conversation.model != nil { modelBadge }
+                        if modelInfo != nil { modelBadge }
                         Button(action: onBeginRename) { Image(systemName: "pencil").font(.system(size: 11, weight: .semibold)) }
                             .buttonStyle(.plain)
                             .foregroundColor(.white.opacity(0.6))
@@ -240,7 +243,7 @@ private struct ConversationCell: View {
                     .lineLimit(2)
             }
             HStack(spacing: 6) {
-                if let model = conversation.model { modelChip(model) }
+                if let model = modelInfo { modelChip(model) }
                 Text(relativeTime(conversation.updatedAt))
                     .font(.system(size: 10))
                     .foregroundColor(.white.opacity(0.35))
@@ -276,22 +279,17 @@ private struct ConversationCell: View {
         Circle().fill(Color.accentColor.opacity(0.8)).frame(width: 6, height: 6)
     }
 
-    private func modelChip(_ name: String) -> some View {
-        Text(prettyModelName(name))
+    private func modelChip(_ model: InstalledModel) -> some View {
+        let details = [model.modelType, model.quantization].compactMap { $0 }.joined(separator: ", ")
+        let text = model.name + (details.isEmpty ? "" : " (\(details))")
+        return Text(text.prefix(18))
             .font(.system(size: 9, weight: .semibold))
             .padding(.vertical, 2)
             .padding(.horizontal, 6)
             .background(Color.accentColor.opacity(0.25))
             .foregroundColor(.white.opacity(0.85))
             .clipShape(Capsule())
-            .help(name)
-    }
-
-    private func prettyModelName(_ raw: String) -> String {
-        raw.replacingOccurrences(of: ".gguf", with: "")
-            .replacingOccurrences(of: "-", with: " ")
-            .prefix(18)
-            .trimmingCharacters(in: .whitespaces)
+            .help(model.fileName)
     }
 
     private func relativeTime(_ date: Date) -> String {

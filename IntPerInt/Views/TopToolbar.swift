@@ -35,7 +35,8 @@ struct TopToolbar: View {
                     Text("(No Valid Models)").tag("__no_models__").disabled(true)
                 } else {
                     ForEach(modelManager.validInstalledModels, id: \.fileName) { m in
-                        Text(prettyModelName(m.fileName)).tag(m.fileName)
+                        let details = [m.modelType, m.quantization].compactMap { $0 }.joined(separator: ", ")
+                        Text(m.name + (details.isEmpty ? "" : " (\(details))")).tag(m.fileName)
                     }
                 }
             }
@@ -73,11 +74,6 @@ struct TopToolbar: View {
     private func setCurrentModel(_ name: String) {
         guard !name.isEmpty else { return }
         modelManager.setCurrentModelForSelectedConversation(name: name)
-    }
-
-    private func prettyModelName(_ raw: String) -> String {
-        raw.replacingOccurrences(of: ".gguf", with: "")
-            .replacingOccurrences(of: "-", with: " ")
     }
 
     @ViewBuilder

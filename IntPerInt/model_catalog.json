@@ -1,0 +1,12 @@
+[
+  {
+    "fileName": "mistral-7b-instruct-v0.1.q4_0.gguf",
+    "modelType": "Instruct",
+    "quantization": "q4_0"
+  },
+  {
+    "fileName": "phi-2.q4_0.gguf",
+    "modelType": "Base",
+    "quantization": "q4_0"
+  }
+]

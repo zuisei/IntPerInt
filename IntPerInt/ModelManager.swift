@@ -9,6 +9,16 @@ public struct InstalledModel: Identifiable, Hashable {
     public let name: String      // 表示名
     public let fileName: String  // 実ファイル名
     public let url: URL
+    public let modelType: String?
+    public let quantization: String?
+
+    public init(name: String, fileName: String, url: URL, modelType: String? = nil, quantization: String? = nil) {
+        self.name = name
+        self.fileName = fileName
+        self.url = url
+        self.modelType = modelType
+        self.quantization = quantization
+    }
 }
 
 @MainActor
@@ -58,6 +68,8 @@ public class ModelManager: ObservableObject {
     var modelsDir: URL { modelsDirectory }
     // Total size of installed models (bytes)
     @Published private(set) var installedTotalBytes: Int64 = 0
+    // Catalog metadata
+    private let catalog: [String: ModelCatalogEntry] = ModelCatalog.load()
 
     // Track in-flight downloads and delegates for progress/cancel
     private var downloadTasks: [String: URLSessionDownloadTask] = [:]
@@ -445,19 +457,25 @@ extension ModelManager {
         }
         
         var built: [InstalledModel] = []
-        
+
         // 単一ファイルを追加
         for url in singleFiles {
             let file = url.lastPathComponent
-            built.append(InstalledModel(name: prettyName(for: file), fileName: file, url: url))
+            let name = prettyName(for: file)
+            let info = catalog[file]
+            let quant = info?.quantization ?? quantization(for: file)
+            built.append(InstalledModel(name: name, fileName: file, url: url, modelType: info?.modelType, quantization: quant))
         }
-        
+
         // 分割ファイルグループを追加（最初のファイルをメインにする）
         for (baseName, urls) in modelGroups {
             let sortedUrls = urls.sorted { $0.lastPathComponent < $1.lastPathComponent }
             if let firstUrl = sortedUrls.first {
-                let displayName = prettyName(for: baseName + ".gguf")
-                built.append(InstalledModel(name: displayName, fileName: firstUrl.lastPathComponent, url: firstUrl))
+                let canonical = baseName + ".gguf"
+                let displayName = prettyName(for: canonical)
+                let info = catalog[canonical] ?? catalog[firstUrl.lastPathComponent]
+                let quant = info?.quantization ?? quantization(for: canonical)
+                built.append(InstalledModel(name: displayName, fileName: firstUrl.lastPathComponent, url: firstUrl, modelType: info?.modelType, quantization: quant))
             }
         }
         
@@ -484,15 +502,17 @@ extension ModelManager {
     }
 
     private func prettyName(for fileName: String) -> String {
-        // 例: "mistral-7b-instruct-v0.1.q4_0.gguf" -> "Mistral 7B Instruct (q4_0)"
-    let base = fileName.replacingOccurrences(of: ".gguf", with: "")
+        let base = fileName.replacingOccurrences(of: ".gguf", with: "")
         let parts = base.split(separator: ".")
-        var main = parts.first.map(String.init) ?? base
-        var quant = parts.dropFirst().joined(separator: ".")
-        // 装飾
-        main = main.replacingOccurrences(of: "-", with: " ").capitalized
-        if !quant.isEmpty { quant = " (\(quant))" }
-        return main + quant
+        let main = parts.first.map(String.init) ?? base
+        return main.replacingOccurrences(of: "-", with: " ").capitalized
+    }
+
+    private func quantization(for fileName: String) -> String? {
+        let base = fileName.replacingOccurrences(of: ".gguf", with: "")
+        let parts = base.split(separator: ".")
+        let quant = parts.dropFirst().joined(separator: ".")
+        return quant.isEmpty ? nil : quant
     }
 }
 
